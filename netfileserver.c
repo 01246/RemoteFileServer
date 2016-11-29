@@ -1,4 +1,3 @@
-//Server
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,39 +7,41 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
-#include "netfileserver.h"
+//#include "netfileserver.h"
 #include "libnetfiles.h"
 
 #define SERV_TCP_PORT 8001
+#define BACKLOG 5
+#define THREAD_MAX 100
 
-int readn(int fd, char * ptr, int nbytes){
+int readn(int fd, char * ptr, int nbytes) {
 	int nleft, nread;
 
 	nleft = nbytes;
-	while(nleft > 0){
-		nread = read(fd,ptr,nleft);
-		if(nread < 0){
-			//error
-			return(nread);
-		}else if(nread == 0){
-			//EOF
-			break;
+	while (nleft > 0) {
+		//nread = read(fd, ptr, nleft);
+		nread = recv(fd, ptr, nbytes, 0);
+
+		if (nread < 0) {
+			return(nread);	//error
+		} else if (nread == 0) {
+			break;			//EOF
 		}
 		nleft -= nread;
 		ptr +=nread;
 	}
-	return(nbytes-nleft);
+	return (nbytes-nleft);
 }
 
-int writen(int fd, char * ptr, int nbytes){
+int writen(int fd, char * ptr, int nbytes) {
 	int nleft, nwritten;
 
 	nleft = nbytes;
-	while(nleft > 0){
+	while (nleft > 0) {
 		nwritten = write(fd,ptr,nleft);
-		if(nwritten <= 0){
+		if (nwritten <= 0) {
 			// ERROR
-			return(nwritten);
+			return (nwritten);
 		}
 		nleft -= nwritten;
 		ptr += nwritten;
@@ -48,108 +49,116 @@ int writen(int fd, char * ptr, int nbytes){
 	return (nbytes-nleft);
 }
 
-int doSomething(int sockfd){
+int doSomethingWithClientFD(int * sockfd) {
 	//Sits on new socket to handle client library requests
-	for(;;){
-		printf("In do something for loop\n");
-		char * buffer[256];
-		Command_packet packet;
-	//read command packet from socket 
-		readn(sockfd,(char*)&packet,sizeof(packet));
-		printf("Command_packet type: %d", packet.type);
+	int i = 0;
+	for (; i < 1; i++) {
+		printf("doSomethingWithClientFD: %d\t", *sockfd);
 
-			//switch on Command_packet type variable
+		//char * buffer[256]; CURRENTLY UNUSED
 
-			//read additional data if necessary 
+		// Read command packet from socket
+		//Command_packet packet;
+		char * str = (char *)malloc(sizeof(char)*20);
+		int nleft = readn(*sockfd, str, strlen(str));
+		printf("Command_packet type: %d, %s\n", nleft, str);
 
-			//execute command
+		//switch on Command_packet type variable
 
-			//populate return command packet with status 
+		//read additional data if necessary 
 
-			//write command packet to socket
+		//execute command
 
-			//write additional data if necessary 
+		//populate return command packet with status 
 
+		//write command packet to socket
 
+		//write additional data if necessary 
 	}
+	return 1;
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
 
-	/*
-		socket file descriptors
-	*/
-	int sockfd, newsockfd; socklen_t clilen;
+	// Declare socket descriptors and client length
+	int sockfd, clientfd; 
+	socklen_t clilen;
 
-	/*
-		Structures, sockaddr_in is defined in library sys/sockets.h
-	*/
-	struct sockaddr_in serv_addr, cli_addr;
-
-	if (argc < 2){
-   		printf("ERROR, no port provided\n");
-  		 exit(1);
+	// Check for input error
+	if (argc < 2) {
+   		printf("ERROR: no port provided\n");
+  		exit(1);
  	}
 
-
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-		printf("server: can't open steam socket\n");
+ 	// Open a TCP stream socket and error check
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		printf("Server: cannot open stream socket\n");
 	}
 
+	// Declare socket address struct
+	struct sockaddr_in serv_addr, cli_addr;
 
-	/*
-		zero out struct serv_addr
-		Initialize domain (ser_addr.sin_family)
-		Initialize server socket internet address, prepares to bind socket to all available interfaces 
-		Initialize server socket to wait on certain specified port
-	*/
-
+	// Fill in struct with zeroes
 	bzero((char *) &serv_addr, sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(SERV_TCP_PORT);
 
-	/*
-		Binds server socket to a specific port, bind must happen in order for listen to happen
-	*/
+	// Initialize socket address
+	serv_addr.sin_family = AF_INET;					// IPv4
+	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);	// Allows socket to bind to all available interfaces
+	serv_addr.sin_port = htons(SERV_TCP_PORT);		// Set socket to wait on specified port
 
-	if(bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
+	// Binds server socket to a specific port to prepare for listen()
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		printf("Can't bind local address\n");
 	}
-	/*
-		Server waits for incoming connection requestions
-		sockfd will be the socket to satisfy these requests 
-	*/
-	listen(sockfd,5);
-	pthread_t clientThreads[100];
+
+	// Server waits for incoming connection requestions; sockfd will be the socket to satisfy these requests
+	if (listen(sockfd, BACKLOG) < 0) {
+		printf("Error in listen()\n");
+	}
+
+	// Initialize thread data
+	pthread_t clientThreads[THREAD_MAX];
 	int flag = 0;
 	int i = 0;
 
-	//sits on accept, waiting for new clients
-	for(; ;){
-		printf("In main loop top\n");
+	// Sits on accept, waiting for new clients
+	while (i < THREAD_MAX) {
+		printf("Listening...\n");
+
+		// Initialize client socket size
 		clilen = sizeof(cli_addr);
-		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		printf("Received accept: blocking \n");
 
-		if(newsockfd < 0){
-			printf("server: accept error");
+		// Accept client socket
+		clientfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+
+		// Error check accept()
+		if (clientfd < 0) {
+			printf("Server: accept() error");
+		} else {
+			printf("Received accept: blocking\n");
 		}
-		if((flag = pthread_create(&clientThreads[i], NULL, (void *)doSomething, (void *)&sockfd))){
-			printf("Threading error");
-		}else if(flag == 0){
+
+		// Open thread for client
+		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)doSomethingWithClientFD, (int *)&sockfd))) {
+			printf("Server: pthread_create() error");
+		} else if (flag == 0) {
 			printf("CONNECTION MADE\n");
-			i++; 
-			
+			i++; 	
 		}
-
-		 
-		
-
-
 	}
-	
 
+	int j;
+	flag = 0;
+	for (j = 0; j < i; i++) {
+
+		// Join threads
+		flag = pthread_join(clientThreads[j], NULL);
+
+		// Erroring checking
+		if (flag) {
+			fprintf(stderr, "ERROR: pthread_join() exited with status %d\n", flag);
+		}
+	}
 }
 
 

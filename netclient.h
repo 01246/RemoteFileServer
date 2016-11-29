@@ -1,3 +1,4 @@
+// Structs
 typedef struct socket{
 	int sockfd;
 	int newsockfd;
@@ -6,3 +7,5 @@ typedef struct socket{
 	int cli_addr;
 	int serv_addr;
 } Socket;
+
+// Functions

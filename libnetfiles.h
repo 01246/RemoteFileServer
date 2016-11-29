@@ -1,11 +1,12 @@
-typedef struct command_packet{
+// Structs
+typedef struct command_packet {
 	int type;
 	int flag;
 	int size;
 	int status;
 } Command_packet;
 
-
+// Functions
 int netserverinit(char * hostname);
 int netopen(const char *pathname, int flags);
 int netclose(int fd);
