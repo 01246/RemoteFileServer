@@ -9,7 +9,7 @@
 #include "netfileserver.h"
 
 #define SERV_TCP_PORT 8001
-#define SERV_HOST_ADDR "127.0.0.1"
+#define SERV_HOST_ADDR "127.0.0.1" // Loop back address
 
 int sockfd;
 

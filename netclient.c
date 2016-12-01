@@ -8,9 +8,11 @@
 #include <unistd.h>
 #include "libnetfiles.h"
 
+#define LOOP_BACK_ADDR "127.0.0.1"
+
 int main(int argc, char *argv[]) {
 
-	if ((netserverinit("127.0.0.1")) < 0) {
+	if ((netserverinit(LOOP_BACK_ADDR)) < 0) {
 		printf("Cannot connect\n");
 		exit(0);
 	}

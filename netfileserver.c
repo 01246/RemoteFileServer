@@ -4,15 +4,19 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
+
 //#include "netfileserver.h"
 #include "libnetfiles.h"
 
 #define SERV_TCP_PORT 8001
+#define SERV_TCP_PORT_STR "8001"
 #define BACKLOG 5
 #define THREAD_MAX 100
+#define LOOP_BACK_ADDR "127.0.0.1"
 
 int readn(int fd, char * ptr, int nbytes) {
 	int nleft, nread;
@@ -81,8 +85,8 @@ int doSomethingWithClientFD(int * sockfd) {
 int main(int argc, char *argv[]) {
 
 	// Declare socket descriptors and client length
-	int sockfd, clientfd; 
-	socklen_t clilen;
+	int sockfd, cli_fd; 
+	socklen_t cli_len;
 
 	// Check for input error
 	if (argc < 2) {
@@ -90,26 +94,46 @@ int main(int argc, char *argv[]) {
   		exit(1);
  	}
 
- 	// Open a TCP stream socket and error check
-	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("Server: cannot open stream socket\n");
-	}
-
-	// Declare socket address struct
-	struct sockaddr_in serv_addr, cli_addr;
+	// Declare address information struct
+	struct addrinfo hints, cli_addr, *servinfo, *p;
 
 	// Fill in struct with zeroes
-	bzero((char *) &serv_addr, sizeof(serv_addr));
+	bzero((char *) &hints, sizeof(hints));
 
-	// Initialize socket address
-	serv_addr.sin_family = AF_INET;					// IPv4
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);	// Allows socket to bind to all available interfaces
-	serv_addr.sin_port = htons(SERV_TCP_PORT);		// Set socket to wait on specified port
+	// Manaually initialize address information struct
+	hints.ai_family = AF_UNSPEC;					// IPv4 or IPv6
+	hints.ai_socktype = SOCK_STREAM;				// Sets as TCP
 
-	// Binds server socket to a specific port to prepare for listen()
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		printf("Can't bind local address\n");
+	// Automatically initialize address information
+	if (getaddrinfo(LOOP_BACK_ADDR, SERV_TCP_PORT_STR, &hints, &servinfo) != 0) {
+		printf("Server: could not get address information\n");
+		exit(1);
 	}
+
+	// Loop through server information for the appropriate address information to start a socket
+	for (p = servinfo; p != NULL; p = p->ai_next) {
+
+		// Attempt to open socket with address information
+		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) {
+			continue;
+		}
+
+		// Binds server socket to a specific port to prepare for listen()
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
+			continue;
+		}
+
+		// Successful connection
+		break;
+	}
+
+	// Check if socket was not bound
+	if (p == NULL) {
+		printf("Server: cannot bind to socket\n");
+	}
+
+	// Free server information
+	freeaddrinfo(servinfo);
 
 	// Server waits for incoming connection requestions; sockfd will be the socket to satisfy these requests
 	if (listen(sockfd, BACKLOG) < 0) {
@@ -126,13 +150,13 @@ int main(int argc, char *argv[]) {
 		printf("Listening...\n");
 
 		// Initialize client socket size
-		clilen = sizeof(cli_addr);
+		cli_len = sizeof(cli_addr);
 
 		// Accept client socket
-		clientfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+		cli_fd = accept(sockfd, (struct sockaddr *) &cli_addr, &cli_len);
 
 		// Error check accept()
-		if (clientfd < 0) {
+		if (cli_fd < 0) {
 			printf("Server: accept() error");
 		} else {
 			printf("Received accept: blocking\n");
