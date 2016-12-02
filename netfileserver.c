@@ -5,11 +5,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
 
-//#include "netfileserver.h"
+#include "netfileserver.h"
 #include "libnetfiles.h"
 
 #define SERV_TCP_PORT 8001
@@ -17,6 +18,43 @@
 #define BACKLOG 5
 #define THREAD_MAX 100
 #define LOOP_BACK_ADDR "127.0.0.1"
+
+/* GET_SERVER_IP
+ *
+ * Fills in string with IPv4 address from getifaddrs()
+ */
+void get_server_ip(char * ip_str) {
+
+	// Declare interface address structs
+	struct ifaddrs *addrs, *temp;
+
+	// Initialize addrs struct
+	getifaddrs(&addrs);
+	temp = addrs;
+
+	// Traverse interface address linked list
+	while (temp) {
+
+		// Check if interface address is an IPv4
+	    if (temp->ifa_addr && temp->ifa_addr->sa_family == AF_INET) {
+
+	    	// Fill in temp socket address 
+	        struct sockaddr_in *t_sockaddr = (struct sockaddr_in *)temp->ifa_addr;
+
+	        // If temp socket address is not the LOOP_BACK_ADDR, copy into ip_str
+	        if (strcmp(LOOP_BACK_ADDR, inet_ntoa(t_sockaddr->sin_addr)) != 0) {
+	        	strcpy(ip_str, inet_ntoa(t_sockaddr->sin_addr));
+	        	printf("%s\n", ip_str);
+	        }
+	    }
+
+	    // Go to next interface address struct
+    	temp = temp->ifa_next;
+	}
+
+	// Free interface address linked list
+	freeifaddrs(addrs);
+}
 
 int readn(int fd, char * ptr, int nbytes) {
 	int nleft, nread;
@@ -57,15 +95,13 @@ int doSomethingWithClientFD(int * sockfd) {
 	//Sits on new socket to handle client library requests
 	int i = 0;
 	for (; i < 1; i++) {
-		printf("doSomethingWithClientFD: %d\t", *sockfd);
+		printf("Server: Preparing to say hello\n");
 
-		//char * buffer[256]; CURRENTLY UNUSED
+		send(*sockfd, "Hello", 10, 0);
 
 		// Read command packet from socket
+
 		//Command_packet packet;
-		char * str = (char *)malloc(sizeof(char)*20);
-		int nleft = readn(*sockfd, str, strlen(str));
-		printf("Command_packet type: %d, %s\n", nleft, str);
 
 		//switch on Command_packet type variable
 
@@ -83,6 +119,12 @@ int doSomethingWithClientFD(int * sockfd) {
 }
 
 int main(int argc, char *argv[]) {
+
+	// Declare and allocate memory for IP address of server
+	char * ip_str = (char *)malloc(sizeof(char)*50);
+
+	// Initialize IP address of server
+	get_server_ip(ip_str);
 
 	// Declare socket descriptors and client length
 	int sockfd, cli_fd; 
@@ -105,7 +147,7 @@ int main(int argc, char *argv[]) {
 	hints.ai_socktype = SOCK_STREAM;				// Sets as TCP
 
 	// Automatically initialize address information
-	if (getaddrinfo(LOOP_BACK_ADDR, SERV_TCP_PORT_STR, &hints, &servinfo) != 0) {
+	if (getaddrinfo(ip_str, SERV_TCP_PORT_STR, &hints, &servinfo) != 0) {
 		printf("Server: could not get address information\n");
 		exit(1);
 	}
@@ -159,11 +201,11 @@ int main(int argc, char *argv[]) {
 		if (cli_fd < 0) {
 			printf("Server: accept() error");
 		} else {
-			printf("Received accept: blocking\n");
+			printf("Server: connection accepted\n");
 		}
 
-		// Open thread for client
-		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)doSomethingWithClientFD, (int *)&sockfd))) {
+		// Open thread for client and pass in client file descriptor
+		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)doSomethingWithClientFD, (int *)&cli_fd))) {
 			printf("Server: pthread_create() error");
 		} else if (flag == 0) {
 			printf("CONNECTION MADE\n");
@@ -171,9 +213,9 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	// Join threads
 	int j;
-	flag = 0;
-	for (j = 0; j < i; i++) {
+	for (j = 0, flag = 0; j < i; i++) {
 
 		// Join threads
 		flag = pthread_join(clientThreads[j], NULL);
@@ -183,6 +225,9 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "ERROR: pthread_join() exited with status %d\n", flag);
 		}
 	}
+
+	// Free IP address of server
+	free(ip_str);
 }
 
 
