@@ -7,11 +7,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+
 #include "libnetfiles.h"
+#include "netclient.h"
 
 #define LOOP_BACK_ADDR "127.0.0.1"
 #define SERVER_IP_ADDR "172.27.203.159"
 #define STEVE_MACHINEIP "192.168.1.9"
+#define IP_SIZE 50
 
 /* GET_SERVER_IP
  *
@@ -52,50 +55,54 @@ void get_server_ip(char * ip_str) {
 
 /* MAIN
  *
+ * Open file, write message, close file
+ * Open file, read message, close file
  */
 int main(int argc, char *argv[]) {
 
+	char filename[50];
+	char message[100];
+
+	strcpy(filename, argv[1]);
+	strcpy(message, argv[2]);
+
 	// Declare and allocate memory for IP address of server
-	//char * ip_str = (char *)malloc(sizeof(char)*50);
+	char * ip_str = (char *)malloc(sizeof(char)*IP_SIZE);
 
 	// Initialize IP address of server
-	//get_server_ip(ip_str);
+	get_server_ip(ip_str);
 
 	// Initialize server connection
-	if ((netserverinit(STEVE_MACHINEIP)) < 0) {
+	if ((netserverinit(ip_str)) < 0) {
 		printf("Cannot connect\n");
 		exit(0);
 	}
 
-	int fd = netopen("test.txt",0);
+	// Open file
+	int fd = netopen(filename, 0);
 
-	printf ("about to write hellow world\n");
-	netwrite(fd,"Hello World!", 12);
-	printf("wrote hello world\n");
+	// Write across the network
+	netwrite(fd, message, strlen(message));
 
+	// Close file
 	netclose(fd);
 
-	fd = netopen("test.txt",0);
-
+	// Open file
+	fd = netopen(argv[1], 0);
 
 	char buf[100];
-	bzero(buf,100);
+	bzero(buf, 100);
 
-	int bytesRead = netread(fd,&buf,12);
+	// Read across the network
+	int bytesRead = netread(fd, &buf, 100);
 
-	printf("Buffer: %s %d\n", buf,bytesRead);
+	printf("bytesRead: %d\n", bytesRead);
 
+	// Close file
 	netclose(fd);
 
 	// Free IP address of server
-	//free(ip_str);
+	free(ip_str);
 
-	// Call functions
-	/*
-	netopen(*pathname, flags);
-	netclose(fd);
-	netread(fildes, *buf, nbyte);
-	netwrite(fildes, *buf, nbyte);
-	*/
-
+	return 0;
 }

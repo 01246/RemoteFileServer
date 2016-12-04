@@ -1,19 +1,14 @@
-all: netfileserver.c netfileserver.h netclient.c netclient.h
-	make libnetfiles
+all: netfileserver.c netfileserver.h netclient.c netclient.h libnetfiles.c libnetfiles.h
 	make client
 	make server
 
 client: netclient.c netclient.h libnetfiles.c libnetfiles.h
-	gcc -Wall -g -o client netclient.c libnetfiles.o
+	gcc -Wall -g -o client netclient.c libnetfiles.c
 
-server: netfileserver.c netfileserver.h
-	gcc -Wall -g -o server netfileserver.c libnetfiles.o
-
-libnetfiles: libnetfiles.c libnetfiles.h
-	gcc -Wall -g -c libnetfiles.c 	
+server: netfileserver.c netfileserver.h libnetfiles.c libnetfiles.h
+	gcc -Wall -g -o server netfileserver.c libnetfiles.c
 
 clean:
-	rm -f libnetfiles.o
 	rm -f client
 	rm -f server
 	rm -rf server.dSYM
