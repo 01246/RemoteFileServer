@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "netfileserver.h"
+#include "libnetfiles.h"
 
 #define SERV_TCP_PORT 8001
 #define SERV_TCP_PORT_STR "8001"
@@ -89,22 +90,109 @@ int netserverinit(char * hostname) {
 	freeaddrinfo(servinfo);
 
 	// Declare buffer
-	char buf[10];
+	/*
+	char buf[100];
+	bzero(buf,100);
 
 	// Receive data from server
-	if (recv(sockfd, buf, 10, 0) < 0) {
-        printf("Client: cannot receive message\n");
-        return -1;
-    }
+	//if (recv(sockfd, buf, 10, 0) < 0) {
+	//int readn(int fd, char * ptr, int nbytes) 
+	
+	//i = readn(sockfd,buf,strlen("Hello Hello"));
+	
+	writeCommand(sockfd,1,1,1,1);
+	writeCommand(sockfd,2,1,1,1);
+	writeCommand(sockfd,3,1,1,1);
+	writeCommand(sockfd,4,1,1,1000030);
+     //   printf("Client: cannot receive message\n");
+       // return -1;
+    //}
 
     // Print data recieved from the server
     printf("Server: %s\n", buf);
 
 	// Close socket
 	close(sockfd);
+	*/
 
 	return 0;
 
+}
+
+
+
+
+void writeCommand(int sockfd, int type, int flag, int size, int status){
+	int iBuf;
+	iBuf = htonl(type);
+	writen(sockfd, (char *)&iBuf, 4);
+
+
+	iBuf = htonl(flag);
+	writen(sockfd, (char *)&iBuf, 4);
+
+
+	iBuf = htonl(size);
+	writen(sockfd, (char *)&iBuf, 4);
+
+	iBuf = htonl(status);
+	writen(sockfd, (char *)&iBuf, 4);
+
+}
+
+Command_packet *  readCommand(int sockfd){
+	int iBuf;
+	Command_packet * packet = (Command_packet *)malloc(sizeof(Command_packet));
+	
+	readn(sockfd,(char *)&iBuf,4);
+	packet->type = ntohl(iBuf);
+
+	readn(sockfd,(char *)&iBuf,4);
+	packet->flag = ntohl(iBuf);
+
+	readn(sockfd,(char *)&iBuf,4);
+	packet->size = ntohl(iBuf);
+
+	readn(sockfd,(char *)&iBuf,4);
+	packet->status = ntohl(iBuf);
+
+	return packet;
+}
+
+
+int readn(int fd, char * ptr, int nbytes) {
+	int nleft, nread;
+
+	nleft = nbytes;
+	while (nleft > 0) {
+		nread = read(fd, ptr, nleft);
+		//nread = recv(fd, ptr, nbytes, 0);
+
+		if (nread < 0) {
+			return(nread);	//error
+		} else if (nread == 0) {
+			break;			//EOF
+		}
+		nleft -= nread;
+		ptr +=nread;
+	}
+	return (nbytes-nleft);
+}
+
+int writen(int fd, char * ptr, int nbytes) {
+	int nleft, nwritten;
+
+	nleft = nbytes;
+	while (nleft > 0) {
+		nwritten = write(fd,ptr,nleft);
+		if (nwritten <= 0) {
+			// ERROR
+			return (nwritten);
+		}
+		nleft -= nwritten;
+		ptr += nwritten;
+	}
+	return (nbytes-nleft);
 }
 
 /* NETOPEN
@@ -112,7 +200,12 @@ int netserverinit(char * hostname) {
  * Returns file descriptor if pathname with appropriate access mode.
  */
 int netopen(const char * pathname, int flags) {
-	return 1;
+
+	writeCommand(sockfd, 1, flags, strlen(pathname),0);
+	writen(sockfd,(char *)pathname,strlen(pathname));
+	Command_packet * cPack = readCommand(sockfd);
+
+	return cPack->status;
 }
 
 /* NETCLOSE
@@ -120,7 +213,12 @@ int netopen(const char * pathname, int flags) {
  * Closes file.
  */
 int netclose(int fd) {
-	return 1;
+
+	writeCommand(sockfd,2,0,0,fd);
+	Command_packet * cPack = readCommand(sockfd);
+
+
+	return cPack->status;
 }
 
 /* NETREAD
@@ -128,7 +226,12 @@ int netclose(int fd) {
  * Returns the number of bytes successfully read from the file.
  */
 ssize_t netread(int fildes, void * buf, size_t nbyte) {
-	return 1;
+
+	writeCommand(sockfd, 3, 0,nbyte, fildes);
+	buf = malloc(sizeof(nbyte));
+	readn(sockfd,buf,nbyte);
+	Command_packet * packet = readCommand(sockfd);
+	return packet->size;
 }
 
 /* NETWRITE
@@ -136,5 +239,17 @@ ssize_t netread(int fildes, void * buf, size_t nbyte) {
  * Returns the number of bytes successfully written to the file.
  */
 ssize_t netwrite(int fildes, const void * buf, size_t nbyte) {
-	return 1;
+
+printf("netwrite aobut to write %zd \n", nbyte);
+
+	writeCommand(sockfd,4,0,nbyte,fildes);
+printf("netwrite wrote command\n");
+	writen(sockfd,(char *)buf,nbyte);
+	printf("netwrite wrote buf %s\n", buf);
+
+	Command_packet * cPack = readCommand(sockfd);
+
+printf("newwrite read command packet\n");
+
+	return cPack->status;
 }

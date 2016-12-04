@@ -11,6 +11,7 @@
 
 #define LOOP_BACK_ADDR "127.0.0.1"
 #define SERVER_IP_ADDR "172.27.203.159"
+#define STEVE_MACHINEIP "192.168.1.9"
 
 /* GET_SERVER_IP
  *
@@ -55,19 +56,39 @@ void get_server_ip(char * ip_str) {
 int main(int argc, char *argv[]) {
 
 	// Declare and allocate memory for IP address of server
-	char * ip_str = (char *)malloc(sizeof(char)*50);
+	//char * ip_str = (char *)malloc(sizeof(char)*50);
 
 	// Initialize IP address of server
-	get_server_ip(ip_str);
+	//get_server_ip(ip_str);
 
 	// Initialize server connection
-	if ((netserverinit(SERVER_IP_ADDR)) < 0) {
+	if ((netserverinit(STEVE_MACHINEIP)) < 0) {
 		printf("Cannot connect\n");
 		exit(0);
 	}
 
+	int fd = netopen("test.txt",0);
+
+	printf ("about to write hellow world\n");
+	netwrite(fd,"Hello World!", 12);
+	printf("wrote hello world\n");
+
+	netclose(fd);
+
+	fd = netopen("test.txt",0);
+
+
+	char buf[100];
+	bzero(buf,100);
+
+	int bytesRead = netread(fd,&buf,12);
+
+	printf("Buffer: %s %d\n", buf,bytesRead);
+
+	netclose(fd);
+
 	// Free IP address of server
-	free(ip_str);
+	//free(ip_str);
 
 	// Call functions
 	/*

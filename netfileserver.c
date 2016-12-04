@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "netfileserver.h"
 #include "libnetfiles.h"
@@ -19,6 +20,7 @@
 #define THREAD_MAX 100
 #define LOOP_BACK_ADDR "127.0.0.1"
 
+Open_File_Data openFiles[100];
 /* GET_SERVER_IP
  *
  * Fills in string with IPv4 address from getifaddrs()
@@ -56,49 +58,103 @@ void get_server_ip(char * ip_str) {
 	freeifaddrs(addrs);
 }
 
-int readn(int fd, char * ptr, int nbytes) {
-	int nleft, nread;
 
-	nleft = nbytes;
-	while (nleft > 0) {
-		//nread = read(fd, ptr, nleft);
-		nread = recv(fd, ptr, nbytes, 0);
-
-		if (nread < 0) {
-			return(nread);	//error
-		} else if (nread == 0) {
-			break;			//EOF
-		}
-		nleft -= nread;
-		ptr +=nread;
-	}
-	return (nbytes-nleft);
-}
-
-int writen(int fd, char * ptr, int nbytes) {
-	int nleft, nwritten;
-
-	nleft = nbytes;
-	while (nleft > 0) {
-		nwritten = write(fd,ptr,nleft);
-		if (nwritten <= 0) {
-			// ERROR
-			return (nwritten);
-		}
-		nleft -= nwritten;
-		ptr += nwritten;
-	}
-	return (nbytes-nleft);
-}
 
 int doSomethingWithClientFD(int * sockfd) {
 	//Sits on new socket to handle client library requests
-	int i = 0;
-	for (; i < 1; i++) {
+	
+	for (;;) {
 		printf("Server: Preparing to say hello\n");
 
-		send(*sockfd, "Hello", 10, 0);
+		//send(*sockfd, "Hello", 10, 0);
+		//writen(*sockfd, "Hello Hello", strlen("Hello Hello"));
+		Command_packet * cPtr = readCommand(*sockfd);
+		switch(cPtr->type){
+			case 1:{
+				printf("1 Received %d %d %d %d\n", cPtr->type,cPtr->flag,cPtr->size,cPtr->status);
+				char buf[300];
+				bzero(buf,300);
+				printf("About to read %d\n", cPtr->size);
+				readn(*sockfd,buf,cPtr->size);
+				printf("Read: %s\n", buf);
 
+				FILE * filedes = fopen(buf,"a+");
+				if (filedes == NULL)
+				{				
+					printf("ERROR can not Open file:-%s- %d\n", buf, errno);
+				}
+				printf("Opened file: \n");
+				int i;
+				for(i = 0; i<100; i++){
+					if(openFiles[i].isActive==0){
+						break;
+					}
+				}
+				printf("chose location %d %zd\n", i, filedes);
+
+				openFiles[i].fp = filedes;
+				openFiles[i].isActive = 1;
+
+				writeCommand(*sockfd,0,0,0,i);
+
+			}
+			break;
+
+			case 2:{
+				printf("2 Received %d %d %d %d\n", cPtr->type,cPtr->flag,cPtr->size,cPtr->status);
+				int index = cPtr->status;
+
+				int status = fclose(openFiles[index].fp);
+				printf("netclose status %d %d\n", status, index);
+
+				openFiles[index].isActive = 0;
+				
+				writeCommand(*sockfd,0,0,0,status);
+			}
+			break;
+
+			case 3: {
+				printf("3 Received %d %d %d %d\n", cPtr->type,cPtr->flag,cPtr->size,cPtr->status);
+				FILE * filedes = openFiles[cPtr->status].fp;
+				char * buf = malloc(cPtr->size);
+				for(int i = 0; i < cPtr->size; i++){
+					*buf = fgetc(filedes);
+					buf++;
+				}
+				writen(*sockfd,buf, cPtr->size);
+				writeCommand(*sockfd,0,0,cPtr->size,0);
+			}
+			break;
+
+			case 4: {
+				printf("4 Received %d %d %d %d\n", cPtr->type,cPtr->flag,cPtr->size,cPtr->status);
+				int index = cPtr->status;
+				FILE* filedes = openFiles[index].fp;
+				printf("netwrite %zd %d \n", filedes, cPtr->size);
+				char *buf = malloc(cPtr->size);
+				bzero(buf,cPtr->size);
+
+				readn(*sockfd,buf,cPtr->size);
+
+				printf("netwrite buf %s \n", buf);
+
+				for(int i = 0; i < cPtr->size; i++){
+					fputc(*buf,filedes);
+					printf("ferror %d \n", ferror(filedes));
+					fflush(filedes);
+					printf ("netwrite wrote a byte-%c-\n", *buf);
+					buf++;
+				}
+				writeCommand(*sockfd,0,0,0,cPtr->size);
+				//char buf[cPtr->size];
+
+			}
+			break;
+
+			default: close(*sockfd);
+			return 1;
+
+		}
 		// Read command packet from socket
 
 		//Command_packet packet;
@@ -118,8 +174,15 @@ int doSomethingWithClientFD(int * sockfd) {
 	return 1;
 }
 
+
+
 int main(int argc, char *argv[]) {
 
+	
+	for(int i = 0; i < 100; i++){
+		//openFiles[i] = (Open_File_Data*)malloc(sizeof(Open_File_Data));
+		openFiles[i].isActive = 0;
+	}
 	// Declare and allocate memory for IP address of server
 	char * ip_str = (char *)malloc(sizeof(char)*50);
 
