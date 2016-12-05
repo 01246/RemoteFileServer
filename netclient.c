@@ -3,8 +3,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <ifaddrs.h>
 #include <netinet/in.h>
+#include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 
@@ -15,6 +15,7 @@
 #define SERVER_IP_ADDR "172.27.203.159"
 #define STEVE_MACHINEIP "192.168.1.9"
 #define IP_SIZE 50
+#define BUFFER_MAX 50
 
 /* GET_SERVER_IP
  *
@@ -61,7 +62,7 @@ void get_server_ip(char * ip_str) {
 int main(int argc, char *argv[]) {
 
 	char filename[50];
-	char message[100];
+	char message[BUFFER_MAX];
 
 	strcpy(filename, argv[1]);
 	strcpy(message, argv[2]);
@@ -88,15 +89,14 @@ int main(int argc, char *argv[]) {
 	netclose(fd);
 
 	// Open file
-	fd = netopen(argv[1], 0);
+	fd = netopen(filename, 0);
 
-	char buf[100];
-	bzero(buf, 100);
+	// Declare and initialize buffer
+	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
+	bzero(buf, BUFFER_MAX);
 
 	// Read across the network
-	int bytesRead = netread(fd, &buf, 100);
-
-	printf("bytesRead: %d\n", bytesRead);
+	netread(fd, buf, BUFFER_MAX);
 
 	// Close file
 	netclose(fd);

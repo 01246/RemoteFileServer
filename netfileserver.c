@@ -19,8 +19,9 @@
 #define BACKLOG 5
 #define THREAD_MAX 100
 #define LOOP_BACK_ADDR "127.0.0.1"
+#define OPEN_FILES_MAX 100
 
-Open_File_Data openFiles[100];
+Open_File_Data openFiles[OPEN_FILES_MAX];
 
 /* GET_SERVER_IP
  *
@@ -73,14 +74,22 @@ int executeClientCommands(int * sockfd) {
 		Command_packet * cPtr = (Command_packet *)readCommand(*sockfd);
 
 		// Declare and initialize buffers, counters, and file descriptors
-		int i;
+		int i, status;
 		int index = cPtr->status;
-		char * buf = (char *)malloc(sizeof(char)*cPtr->size+1);
+		char * buf = (char *)malloc(sizeof(char)*cPtr->size);
 		FILE * fd;
+
+/*
+		printf("Received type:%d, flag:%d, size:%d, status:%d\n", 
+			cPtr->type, 
+			cPtr->flag, 
+			cPtr->size, 
+			cPtr->status
+		);
+*/
 
 		switch (cPtr->type) {
 			case 1: // Open
-				printf("Received type:%d flag:%d, size:%d, status:%d\n", cPtr->type, cPtr->flag, cPtr->size, cPtr->status);
 
 				// Zero buffer
 				bzero(buf, cPtr->size);
@@ -90,7 +99,6 @@ int executeClientCommands(int * sockfd) {
 
 				// Open file
 				fd = fopen(buf, "a+");
-				printf("Server: netopen %s\n", buf);
 
 				// Error check file
 				if (fd == NULL) {				
@@ -98,12 +106,12 @@ int executeClientCommands(int * sockfd) {
 				}
 
 				// Loop through array to find first open index
-				for (i = 0; i < 100; i++) {
+				for (i = 0; i < OPEN_FILES_MAX; i++) {
 					if (!openFiles[i].isActive) {
 						break;
 					}
 				}
-				printf("Server: location %d %zd\n", i, fd);
+				printf("Server: netopen  %zd %s index:%d\n", fd, buf, i);
 
 				// Initialize open file array at corresponding index
 				openFiles[i].fp = fd;
@@ -114,11 +122,10 @@ int executeClientCommands(int * sockfd) {
 				break;
 
 			case 2: // Close
-				printf("Received type:%d flag:%d, size:%d, status:%d\n", cPtr->type, cPtr->flag, cPtr->size, cPtr->status);
 
 				// Close file
-				int status = fclose(openFiles[index].fp);
-				printf("Server: netclose status:%d index:%d\n", status, index);
+				status = fclose(openFiles[index].fp);
+				printf("Server: netclose %zd status:%d  index:%d\n", openFiles[index].fp, status, index);
 
 				// Set file as inactive in open file array
 				openFiles[index].isActive = 0;
@@ -128,16 +135,18 @@ int executeClientCommands(int * sockfd) {
 				break;
 
 			case 3: // Read
-				printf("Received type:%d flag:%d, size:%d, status:%d\n", cPtr->type, cPtr->flag, cPtr->size, cPtr->status);
 
-				// Get file descriptor
-				fd = openFiles[cPtr->status].fp;
-				printf("Server: netread %zd %d\n", fd, cPtr->size);
+				// Get file descriptor and jump to front of file
+				fd = openFiles[index].fp;
+				fseek(fd, 0, SEEK_SET);
+				printf("Server: netread  %zd size:%d\n", fd, cPtr->size);
+
+				// Zero out buffer
+				bzero(buf, cPtr->size);
 				
 				// Read one byte at time from file across the network
-				for (i = 0; i < cPtr->size; i++) {
+				for (i = 0; i < cPtr->size && !feof(fd); i++) {
 					buf[i] = fgetc(fd);
-					//printf("Server: netread read a byte-%c\n", buf[i]);
 				}
 
 				// Send the bytes read to the client
@@ -148,11 +157,10 @@ int executeClientCommands(int * sockfd) {
 				break;
 
 			case 4: // Write
-				printf("Received type:%d flag:%d, size:%d, status:%d\n", cPtr->type, cPtr->flag, cPtr->size, cPtr->status);
 
 				// Get file descriptor
 				fd = openFiles[index].fp;
-				printf("Server: netwrite %zd %d\n", fd, cPtr->size);
+				printf("Server: netwrite %zd size:%d\n", fd, cPtr->size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size);
@@ -163,7 +171,7 @@ int executeClientCommands(int * sockfd) {
 				// Write one byte at time from file across the network
 				for (i = 0; i < cPtr->size; i++, buf++) {
 					fputc(*buf, fd);
-					printf("Server: netwrite wrote a byte-%c-%d\n", *buf, ferror(fd));
+					//printf("Server: netwrite wrote a byte-%c-%d\n", *buf, ferror(fd));
 					fflush(fd);
 				}
 
@@ -187,9 +195,8 @@ int executeClientCommands(int * sockfd) {
  */
 int main(int argc, char *argv[]) {
 
-	// 
-	for (int i = 0; i < 100; i++) {
-		//openFiles[i] = (Open_File_Data*)malloc(sizeof(Open_File_Data));
+	// Initialize openFiles array
+	for (int i = 0; i < OPEN_FILES_MAX; i++) {
 		openFiles[i].isActive = 0;
 	}
 
@@ -278,14 +285,13 @@ int main(int argc, char *argv[]) {
 		if (cli_fd < 0) {
 			printf("Server: accept() error");
 		} else {
-			printf("Server: connection accepted\n");
+			printf("Server: Connection accepted\n");
 		}
 
 		// Open thread for client and pass in client file descriptor
 		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)executeClientCommands, (int *)&cli_fd))) {
 			printf("Server: pthread_create() error");
 		} else if (flag == 0) {
-			printf("CONNECTION MADE\n");
 			i++; 	
 		}
 	}
