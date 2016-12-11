@@ -49,6 +49,7 @@ void get_server_ip(char * ip_str) {
 	        if (strcmp(LOOP_BACK_ADDR, inet_ntoa(t_sockaddr->sin_addr)) != 0) {
 	        	strcpy(ip_str, inet_ntoa(t_sockaddr->sin_addr));
 	        	printf("%s\n", ip_str);
+	        	break;
 	        }
 	    }
 
@@ -312,4 +313,6 @@ int main(int argc, char *argv[]) {
 
 	// Free IP address of server
 	free(ip_str);
+
+	return 0;
 }

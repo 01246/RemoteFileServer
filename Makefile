@@ -6,7 +6,7 @@ client: netclient.c netclient.h libnetfiles.c libnetfiles.h
 	gcc -Wall -g -o client netclient.c libnetfiles.c
 
 server: netfileserver.c netfileserver.h libnetfiles.c libnetfiles.h
-	gcc -Wall -g -o server netfileserver.c libnetfiles.c
+	gcc -Wall -g -o server netfileserver.c libnetfiles.c -pthread
 
 clean:
 	rm -f client

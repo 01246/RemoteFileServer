@@ -14,8 +14,9 @@
 #define LOOP_BACK_ADDR "127.0.0.1"
 #define SERVER_IP_ADDR "172.27.203.159"
 #define STEVE_MACHINEIP "192.168.1.9"
+#define ILAB_MACHINE_IP "128.6.13.174"
 #define IP_SIZE 50
-#define BUFFER_MAX 50
+#define BUFFER_MAX 100
 
 /* GET_SERVER_IP
  *
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
 	get_server_ip(ip_str);
 
 	// Initialize server connection
-	if ((netserverinit(ip_str)) < 0) {
+	if ((netserverinit(ILAB_MACHINE_IP)) < 0) {
 		printf("Cannot connect\n");
 		exit(0);
 	}

@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "netfileserver.h"
 #include "libnetfiles.h"
@@ -37,6 +38,8 @@ void * get_in_addr(struct sockaddr *sa) {
  */
 int netserverinit(char * hostname) {
 
+	printf("Init connection: %s\n", hostname);
+
     // Declare socket address struct
     struct addrinfo hints, *servinfo, *p;
     char s[INET6_ADDRSTRLEN]; // 46
@@ -59,7 +62,7 @@ int netserverinit(char * hostname) {
 
 		// Attempt to open socket with address information
 		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) {
-			printf("socket() failed\n");
+			perror("socket error");
 			continue;
 		}
 
@@ -68,7 +71,7 @@ int netserverinit(char * hostname) {
 		if (connect(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
 
 			// Report error
-			printf("Client: Cannot connect to the server\n");
+			perror("connection error");
 
 			// Close socket
 			close(sockfd);
@@ -83,6 +86,7 @@ int netserverinit(char * hostname) {
 	// Check if socket was not bound
 	if (p == NULL) {
 		printf("Client: cannot bind to socket\n");
+		return -1;
 	}
 
 	// Get IP address from socket address
