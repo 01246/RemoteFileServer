@@ -258,7 +258,7 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
 
 	// Read character into buffer
 	readn(sockfd, (char *)buf, nbyte);
-	printf("Client: netread: %s %zd\n", buf, (size_t)nbyte);
+	printf("Client: netread: %s %zd\n", (char *)buf, (size_t)nbyte);
 
 	// Receive response from server
 	Command_packet * packet = (Command_packet *)readCommand(sockfd);
@@ -278,7 +278,7 @@ ssize_t netwrite(int fd, const void * buf, size_t nbyte) {
 
 	// Send buffer to be written to server
 	writen(sockfd, (char *)buf, nbyte);
-	printf("Client: netwrite: %s\n", buf);
+	printf("Client: netwrite: %s\n", (char *)buf);
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
