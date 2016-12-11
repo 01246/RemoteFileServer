@@ -81,25 +81,17 @@ int main(int argc, char *argv[]) {
 
 	// Open file
 	int fd = netopen(filename, 0);
+	int fd2 = netopen(filename, 0);
 
-	// Write across the network
-	netwrite(fd, message, strlen(message));
+	netwrite(fd2, message, strlen(message));
 
-	// Close file
-	netclose(fd);
-
-	// Open file
-	fd = netopen(filename, 0);
-
-	// Declare and initialize buffer
 	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
 	bzero(buf, BUFFER_MAX);
 
-	// Read across the network
 	netread(fd, buf, BUFFER_MAX);
 
-	// Close file
 	netclose(fd);
+	netclose(fd2);
 
 	// Free IP address of server
 	free(ip_str);

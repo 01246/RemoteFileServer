@@ -111,7 +111,7 @@ int executeClientCommands(int * sockfd) {
 						break;
 					}
 				}
-				printf("Server: netopen  %zd %s index:%d\n", fd, buf, i);
+				printf("Server: netopen  %zd %s index:%d\n", (size_t)fd, buf, i);
 
 				// Initialize open file array at corresponding index
 				openFiles[i].fp = fd;
@@ -125,7 +125,7 @@ int executeClientCommands(int * sockfd) {
 
 				// Close file
 				status = fclose(openFiles[index].fp);
-				printf("Server: netclose %zd status:%d  index:%d\n", openFiles[index].fp, status, index);
+				printf("Server: netclose %zd status:%d  index:%d\n", (size_t)openFiles[index].fp, status, index);
 
 				// Set file as inactive in open file array
 				openFiles[index].isActive = 0;
@@ -139,7 +139,7 @@ int executeClientCommands(int * sockfd) {
 				// Get file descriptor and jump to front of file
 				fd = openFiles[index].fp;
 				fseek(fd, 0, SEEK_SET);
-				printf("Server: netread  %zd size:%d\n", fd, cPtr->size);
+				printf("Server: netread  %zd size:%d\n", (size_t)fd, cPtr->size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size);
@@ -160,7 +160,7 @@ int executeClientCommands(int * sockfd) {
 
 				// Get file descriptor
 				fd = openFiles[index].fp;
-				printf("Server: netwrite %zd size:%d\n", fd, cPtr->size);
+				printf("Server: netwrite %zd size:%d\n", (size_t)fd, cPtr->size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size);
@@ -196,7 +196,8 @@ int executeClientCommands(int * sockfd) {
 int main(int argc, char *argv[]) {
 
 	// Initialize openFiles array
-	for (int i = 0; i < OPEN_FILES_MAX; i++) {
+	int i;
+	for (i = 0; i < OPEN_FILES_MAX; i++) {
 		openFiles[i].isActive = 0;
 	}
 
@@ -269,7 +270,7 @@ int main(int argc, char *argv[]) {
 	// Initialize thread data
 	pthread_t clientThreads[THREAD_MAX];
 	int flag = 0;
-	int i = 0;
+	i = 0;
 
 	// Sits on accept, waiting for new clients
 	while (i < THREAD_MAX) {

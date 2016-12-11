@@ -1,0 +1,21 @@
+ERROR CHECKING
+
+netopen()
+EACCES          Permission denied (POSIX.1)
+EINTR           Interrupted function call (POSIX.1); see signal(7).
+EISDIR          Is a directory (POSIX.1)
+ENOENT          No such file or directory (POSIX.1) 
+				Typically, this error results when a specified pathname does not exist, or one of the components in the directory prefix of a pathname does not exist, or the specified pathname is a dangling symbolic link.
+EROFS           Read-only filesystem (POSIX.1)
+ENFILE			Too many open files in system (POSIX.1)
+				On Linux, this is probably a result of encountering the /proc/sys/fs/file-max limit (see proc(5)).
+EWOULDBLOCK     Operation would block (may be same value as EAGAIN) (POSIX.1)
+EPERM           Operation not permitted (POSIX.1)
+
+netread(), netwrite()
+ETIMEDOUT       Connection timed out (POSIX.1)
+EBADR           Invalid request descriptor
+ECONNRESET      Connection reset (POSIX.1)
+
+netclose()
+EBADR           Invalid request descriptor
