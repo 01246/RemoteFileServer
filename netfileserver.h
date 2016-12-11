@@ -5,6 +5,5 @@ typedef struct open_file_data {
 } Open_File_Data;
 
 // Functions
-int readn(int fd, char * ptr, int nbytes);
-int writen(int fd, char * ptr, int nbytes);
-int doSomething(int sockfd);
+int get_server_ip(char * ip_str);
+int executeClientCommands(int * sockfd);

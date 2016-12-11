@@ -21,19 +21,23 @@
 #define LOOP_BACK_ADDR "127.0.0.1"
 #define OPEN_FILES_MAX 100
 
-Open_File_Data openFiles[OPEN_FILES_MAX];
+Open_File_Data openFiles[THREAD_MAX][OPEN_FILES_MAX];
+int client_id = -1;
 
 /* GET_SERVER_IP
  *
  * Fills in string with IPv4 address from getifaddrs().
  */
-void get_server_ip(char * ip_str) {
+int get_server_ip(char * ip_str) {
 
 	// Declare interface address structs
 	struct ifaddrs *addrs, *temp;
 
 	// Initialize addrs struct
-	getifaddrs(&addrs);
+	if (getifaddrs(&addrs) < 0) {
+		perror("Server");
+		return -1;
+	}
 	temp = addrs;
 
 	// Traverse interface address linked list
@@ -59,6 +63,8 @@ void get_server_ip(char * ip_str) {
 
 	// Free interface address linked list
 	freeifaddrs(addrs);
+
+	return 0;
 }
 
 
@@ -76,18 +82,19 @@ int executeClientCommands(int * sockfd) {
 
 		// Declare and initialize buffers, counters, and file descriptors
 		int i, status;
+		int cli_id = client_id;
 		int index = cPtr->status;
 		char * buf = (char *)malloc(sizeof(char)*cPtr->size);
 		FILE * fd;
 
-/*
+		/*
 		printf("Received type:%d, flag:%d, size:%d, status:%d\n", 
 			cPtr->type, 
 			cPtr->flag, 
 			cPtr->size, 
 			cPtr->status
 		);
-*/
+		*/
 
 		switch (cPtr->type) {
 			case 1: // Open
@@ -108,15 +115,15 @@ int executeClientCommands(int * sockfd) {
 
 				// Loop through array to find first open index
 				for (i = 0; i < OPEN_FILES_MAX; i++) {
-					if (!openFiles[i].isActive) {
+					if (!openFiles[cli_id][i].isActive) {
 						break;
 					}
 				}
-				printf("Server: netopen  %zd %s index:%d\n", (size_t)fd, buf, i);
+				printf("Server: netopen  %d %zd %s index:%d\n", cli_id, (size_t)fd, buf, i);
 
 				// Initialize open file array at corresponding index
-				openFiles[i].fp = fd;
-				openFiles[i].isActive = 1;
+				openFiles[cli_id][i].fp = fd;
+				openFiles[cli_id][i].isActive = 1;
 
 				// Send response to client
 				writeCommand(*sockfd, 0, 0, 0, i);
@@ -125,11 +132,11 @@ int executeClientCommands(int * sockfd) {
 			case 2: // Close
 
 				// Close file
-				status = fclose(openFiles[index].fp);
-				printf("Server: netclose %zd status:%d  index:%d\n", (size_t)openFiles[index].fp, status, index);
+				status = fclose(openFiles[cli_id][index].fp);
+				printf("Server: netclose %d %zd status:%d  index:%d\n", cli_id, (size_t)openFiles[cli_id][index].fp, status, index);
 
 				// Set file as inactive in open file array
-				openFiles[index].isActive = 0;
+				openFiles[cli_id][index].isActive = 0;
 				
 				// Send message to client
 				writeCommand(*sockfd, 0, 0, 0, status);
@@ -138,9 +145,9 @@ int executeClientCommands(int * sockfd) {
 			case 3: // Read
 
 				// Get file descriptor and jump to front of file
-				fd = openFiles[index].fp;
+				fd = openFiles[cli_id][index].fp;
 				fseek(fd, 0, SEEK_SET);
-				printf("Server: netread  %zd size:%d\n", (size_t)fd, cPtr->size);
+				printf("Server: netread  %d %zd size:%d\n", cli_id, (size_t)fd, cPtr->size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size);
@@ -160,8 +167,8 @@ int executeClientCommands(int * sockfd) {
 			case 4: // Write
 
 				// Get file descriptor
-				fd = openFiles[index].fp;
-				printf("Server: netwrite %zd size:%d\n", (size_t)fd, cPtr->size);
+				fd = openFiles[cli_id][index].fp;
+				printf("Server: netwrite %d %zd size:%d\n", cli_id, (size_t)fd, cPtr->size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size);
@@ -197,16 +204,20 @@ int executeClientCommands(int * sockfd) {
 int main(int argc, char *argv[]) {
 
 	// Initialize openFiles array
-	int i;
-	for (i = 0; i < OPEN_FILES_MAX; i++) {
-		openFiles[i].isActive = 0;
+	int i, j;
+	for (i = 0; i < THREAD_MAX; i++) {
+		for (j = 0; j < OPEN_FILES_MAX; j++) {
+			openFiles[i][j].isActive = 0;
+		}
 	}
 
 	// Declare and allocate memory for IP address of server
 	char * ip_str = (char *)malloc(sizeof(char)*50);
 
 	// Initialize IP address of server
-	get_server_ip(ip_str);
+	if (get_server_ip(ip_str) < 0) {
+		return 0;
+	}
 
 	// Declare socket descriptors and client length
 	int sockfd, cli_fd; 
@@ -214,7 +225,7 @@ int main(int argc, char *argv[]) {
 
 	// Check for input error
 	if (argc != 2) {
-   		printf("ERROR: Provide port\n");
+   		fprintf(stderr, "usage: %s <port>\n", argv[0]);
   		exit(1);
  	}
 
@@ -234,7 +245,7 @@ int main(int argc, char *argv[]) {
 
 	// Automatically initialize address information
 	if (getaddrinfo(ip_str, port, &hints, &servinfo) != 0) {
-		printf("Server: could not get address information\n");
+		perror("Server");
 		exit(1);
 	}
 
@@ -257,7 +268,7 @@ int main(int argc, char *argv[]) {
 
 	// Check if socket was not bound
 	if (p == NULL) {
-		printf("Server: cannot bind to socket\n");
+		perror("Server");
 	}
 
 	// Free server information
@@ -265,7 +276,7 @@ int main(int argc, char *argv[]) {
 
 	// Server waits for incoming connection requestions; sockfd will be the socket to satisfy these requests
 	if (listen(sockfd, BACKLOG) < 0) {
-		printf("Error in listen()\n");
+		perror("Server");
 	}
 
 	// Initialize thread data
@@ -279,13 +290,14 @@ int main(int argc, char *argv[]) {
 
 		// Initialize client socket size
 		cli_len = sizeof(cli_addr);
+		client_id++;
 
 		// Accept client socket
 		cli_fd = accept(sockfd, (struct sockaddr *) &cli_addr, &cli_len);
 
 		// Error check accept()
 		if (cli_fd < 0) {
-			printf("Server: accept() error");
+			perror("Server");
 		} else {
 			printf("Server: Connection accepted\n");
 		}
@@ -299,7 +311,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Join threads
-	int j;
 	for (j = 0, flag = 0; j < i; i++) {
 
 		// Join threads
@@ -307,7 +318,7 @@ int main(int argc, char *argv[]) {
 
 		// Erroring checking
 		if (flag) {
-			fprintf(stderr, "ERROR: pthread_join() exited with status %d\n", flag);
+			fprintf(stderr, "Server: pthread_join() exited with status %d\n", flag);
 		}
 	}
 

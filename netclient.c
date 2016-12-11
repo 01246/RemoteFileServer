@@ -13,9 +13,8 @@
 
 #define LOOP_BACK_ADDR "127.0.0.1"
 #define SERVER_IP_ADDR "172.27.203.159"
-#define STEVE_MACHINEIP "192.168.1.9"
-#define ILAB_MACHINE_IP "128.6.13.174"
 #define IP_SIZE 50
+#define IN_FILENAME_MAX 50
 #define BUFFER_MAX 100
 
 /* GET_SERVER_IP
@@ -55,14 +54,10 @@ void get_server_ip(char * ip_str) {
 	freeifaddrs(addrs);
 }
 
-/* MAIN
- *
- * Open file, write message, close file
- * Open file, read message, close file
- */
+/* MAIN */
 int main(int argc, char *argv[]) {
 
-	char filename[50];
+	char filename[IN_FILENAME_MAX];
 	char message[BUFFER_MAX];
 
 	strcpy(filename, argv[1]);
@@ -75,8 +70,8 @@ int main(int argc, char *argv[]) {
 	get_server_ip(ip_str);
 
 	// Initialize server connection
-	if ((netserverinit(ILAB_MACHINE_IP)) < 0) {
-		printf("Cannot connect\n");
+	if ((netserverinit(ip_str)) < 0) {
+		printf("Client: Cannot connect\n");
 		exit(0);
 	}
 
@@ -91,11 +86,15 @@ int main(int argc, char *argv[]) {
 
 	netread(fd, buf, BUFFER_MAX);
 
+	sleep(6);
+
+	// Close file
 	netclose(fd);
 	netclose(fd2);
 
 	// Free IP address of server
 	free(ip_str);
+	free(buf);
 
 	return 0;
 }

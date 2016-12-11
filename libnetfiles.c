@@ -20,12 +20,12 @@ int sockfd;
 
 /* GET_IN_ADDR
  *
- * 
+ * Returns the correct IP address (IPv4 or IPv6)
  */
-void * get_in_addr(struct sockaddr *sa) {
+void * get_in_addr(struct sockaddr * sa) {
 
 	if (sa->sa_family == AF_INET) {
-		return &(((struct sockaddr_in*)sa)->sin_addr);
+		return &(((struct sockaddr_in *)sa)->sin_addr);
 	}
 
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
@@ -62,7 +62,7 @@ int netserverinit(char * hostname) {
 
 		// Attempt to open socket with address information
 		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) {
-			perror("socket error");
+			perror("Client");
 			continue;
 		}
 
@@ -71,7 +71,7 @@ int netserverinit(char * hostname) {
 		if (connect(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
 
 			// Report error
-			perror("connection error");
+			perror("Client");
 
 			// Close socket
 			close(sockfd);
@@ -85,7 +85,7 @@ int netserverinit(char * hostname) {
 
 	// Check if socket was not bound
 	if (p == NULL) {
-		printf("Client: cannot bind to socket\n");
+		perror("Client");
 		return -1;
 	}
 
@@ -138,8 +138,10 @@ void * readCommand(int sockfd) {
 	int iBuf;
 
 	// Allocate memory for command packet struct
+	/* LOCK */
 	Command_packet * packet = (Command_packet *)malloc(sizeof(Command_packet));
-	
+	/* UNLOCK */
+
 	// Get type
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->type = ntohl(iBuf);
@@ -228,8 +230,12 @@ int netopen(const char * pathname, int flags) {
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
+	// Get status and free command packet
+	int stat = cPack->status;
+	free(cPack);
+
 	// Return status received from server
-	return cPack->status;
+	return stat;
 }
 
 /* NETCLOSE
@@ -244,8 +250,12 @@ int netclose(int fd) {
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
+	// Get status and free command packet
+	int stat = cPack->status;
+	free(cPack);
+
 	// Return status received from server
-	return cPack->status;
+	return stat;
 }
 
 /* NETREAD
@@ -287,6 +297,10 @@ ssize_t netwrite(int fd, const void * buf, size_t nbyte) {
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
-	// Return size of write from server
-	return cPack->status;
+	// Get status and free command packet
+	int stat = cPack->status;
+	free(cPack);
+
+	// Return status received from server
+	return stat;
 }
