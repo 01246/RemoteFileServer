@@ -22,7 +22,7 @@
 #define OPEN_FILES_MAX 100
 
 Open_File_Data openFiles[THREAD_MAX][OPEN_FILES_MAX];
-int client_id = -1;
+int client_id = 0;
 
 /* GET_SERVER_IP
  *
@@ -74,19 +74,24 @@ int get_server_ip(char * ip_str) {
  */
 int executeClientCommands(int * sockfd) {
 	
+	int j = 0;
 	// Loop through incoming client commands
 	while (1) {
+		j++;
 
 		// Receive command packet from client
 		Command_packet * cPtr = (Command_packet *)readCommand(*sockfd);
 
 		// Declare and initialize buffers, counters, and file descriptors
-		int i, status;
+		int i, status, nbytes;
 		int cli_id = client_id;
-		int index = cPtr->status;
-		char * buf = (char *)malloc(sizeof(char)*cPtr->size);
+		int cmd_type = cPtr->type;
+		// flag ?
+		int wr_size = cPtr->size;
+		int fd_index = cPtr->status;
+		char * buf = (char *)malloc(sizeof(char)*(wr_size+1));
 		FILE * fd;
-
+		
 		/*
 		printf("Received type:%d, flag:%d, size:%d, status:%d\n", 
 			cPtr->type, 
@@ -96,47 +101,65 @@ int executeClientCommands(int * sockfd) {
 		);
 		*/
 
-		switch (cPtr->type) {
+		// Free command packet -- may need a lock
+		free(cPtr);
+
+		switch (cmd_type) {
 			case 1: // Open
 
 				// Zero buffer
-				bzero(buf, cPtr->size);
+				bzero(buf, (wr_size+1));
 
 				// Read filename
-				readn(*sockfd, buf, cPtr->size);
+				nbytes = readn(*sockfd, buf, wr_size);
+
+				// Error check readn
+				if (nbytes != wr_size){
+					printf("ERROR reading filename\n");
+				}
 
 				// Open file
-				fd = fopen(buf, "a+");
+				fd = fopen(buf, "a+"); // need to be dynamic
 
 				// Error check file
 				if (fd == NULL) {				
 					printf("ERROR cannot open file:-%s-%d\n", buf, errno);
 				}
 
-				// Loop through array to find first open index
+				// Loop through array to find first open fd_index
 				for (i = 0; i < OPEN_FILES_MAX; i++) {
 					if (!openFiles[cli_id][i].isActive) {
 						break;
 					}
 				}
-				printf("Server: netopen  %d %zd %s index:%d\n", cli_id, (size_t)fd, buf, i);
+				printf("Server: netopen  %d %zd %s fd_index:%d\n", cli_id, (size_t)fd, buf, i);
 
-				// Initialize open file array at corresponding index
+				// Initialize open file array at corresponding fd_index
 				openFiles[cli_id][i].fp = fd;
 				openFiles[cli_id][i].isActive = 1;
 
 				// Send response to client
 				writeCommand(*sockfd, 0, 0, 0, i);
+
+				// Free buffer
+				free(buf);
+
 				break;
 
 			case 2: // Close
 
+				if (!openFiles[cli_id][fd_index].isActive) {
+					printf("Server: file not active\n");
+					break;
+				}				
+
 				// Close file
-				status = fclose(openFiles[cli_id][index].fp);
-				printf("Server: netclose %d %zd status:%d  index:%d\n", cli_id, (size_t)openFiles[cli_id][index].fp, status, index);
+				status = fclose(openFiles[cli_id][fd_index].fp);
+				printf("Server: netclose %d %zd status:%d  fd_index:%d\n", 
+					cli_id, (size_t)openFiles[cli_id][fd_index].fp, status, fd_index);
 
 				// Set file as inactive in open file array
-				openFiles[cli_id][index].isActive = 0;
+				openFiles[cli_id][fd_index].isActive = 0;
 				
 				// Send message to client
 				writeCommand(*sockfd, 0, 0, 0, status);
@@ -145,12 +168,12 @@ int executeClientCommands(int * sockfd) {
 			case 3: // Read
 
 				// Get file descriptor and jump to front of file
-				fd = openFiles[cli_id][index].fp;
+				fd = openFiles[cli_id][fd_index].fp;
 				fseek(fd, 0, SEEK_SET);
-				printf("Server: netread  %d %zd size:%d\n", cli_id, (size_t)fd, cPtr->size);
+				printf("Server: netread  %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
-				bzero(buf, cPtr->size);
+				bzero(buf, cPtr->size+1);
 				
 				// Read one byte at time from file across the network
 				for (i = 0; i < cPtr->size && !feof(fd); i++) {
@@ -158,36 +181,53 @@ int executeClientCommands(int * sockfd) {
 				}
 
 				// Send the bytes read to the client
-				writen(*sockfd, buf, cPtr->size);
+				nbytes = writen(*sockfd, buf, wr_size);
+
+				// Error check writen
+				if (nbytes != cPtr->size){
+					printf("ERROR writing buffer\n");
+				}
 
 				// Send message to client
-				writeCommand(*sockfd, 0, 0, cPtr->size, 0);
+				writeCommand(*sockfd, 0, 0, wr_size, 0);
+
+				// Free buffer
+				free(buf);
+
 				break;
 
 			case 4: // Write
 
 				// Get file descriptor
-				fd = openFiles[cli_id][index].fp;
-				printf("Server: netwrite %d %zd size:%d\n", cli_id, (size_t)fd, cPtr->size);
+				fd = openFiles[cli_id][fd_index].fp;
+				printf("Server: netwrite %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
-				bzero(buf, cPtr->size);
+				bzero(buf, cPtr->size+1);
 
 				// Read the bytes to be written from the client
-				readn(*sockfd, buf, cPtr->size);
+				nbytes = readn(*sockfd, buf, wr_size);
+
+				// Error check readn
+				if (nbytes != cPtr->size){
+					printf("ERROR writing buffer\n");
+				}
 
 				// Write one byte at time from file across the network
 				for (i = 0; i < cPtr->size; i++, buf++) {
 					fputc(*buf, fd);
-					//printf("Server: netwrite wrote a byte-%c-%d\n", *buf, ferror(fd));
 					fflush(fd);
 				}
 
 				// Send message to client
-				writeCommand(*sockfd, 0, 0, 0, cPtr->size);
+				writeCommand(*sockfd, 0, 0, 0, wr_size);
+
+				// Free buffer
+				free(buf);
 				break;
 
 			default:
+				printf("Server: finished reading commands. Closing socket\n");
 				close(*sockfd);
 				return 1;
 		}
@@ -290,7 +330,6 @@ int main(int argc, char *argv[]) {
 
 		// Initialize client socket size
 		cli_len = sizeof(cli_addr);
-		client_id++;
 
 		// Accept client socket
 		cli_fd = accept(sockfd, (struct sockaddr *) &cli_addr, &cli_len);
@@ -306,12 +345,13 @@ int main(int argc, char *argv[]) {
 		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)executeClientCommands, (int *)&cli_fd))) {
 			printf("Server: pthread_create() error");
 		} else if (flag == 0) {
-			i++; 	
+			i++;
+			client_id++;
 		}
 	}
 
 	// Join threads
-	for (j = 0, flag = 0; j < i; i++) {
+	for (j = 0, flag = 0; j < i; j++) {
 
 		// Join threads
 		flag = pthread_join(clientThreads[j], NULL);

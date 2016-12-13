@@ -1,7 +1,7 @@
 // Structs
 typedef struct command_packet {
 	int type;		// type of command (open, close, read, write)
-	int flag;		// 
+	int flag;		// ???
 	int size;		// number of bytes in read or write
 	int status;		// file descriptor
 } Command_packet;

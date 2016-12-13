@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <errno.h>
 
 #include "netfileserver.h"
@@ -17,6 +18,7 @@
 #define SERV_HOST_ADDR "127.0.0.1" // Loop back address
 
 int sockfd;
+pthread_mutex_t read_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* GET_IN_ADDR
  *
@@ -138,9 +140,9 @@ void * readCommand(int sockfd) {
 	int iBuf;
 
 	// Allocate memory for command packet struct
-	/* LOCK */
+	pthread_mutex_lock(&read_lock);
 	Command_packet * packet = (Command_packet *)malloc(sizeof(Command_packet));
-	/* UNLOCK */
+	pthread_mutex_unlock(&read_lock);
 
 	// Get type
 	readn(sockfd, (char *)&iBuf, 4);
@@ -224,18 +226,20 @@ int netopen(const char * pathname, int flags) {
 	// Send command to server
 	writeCommand(sockfd, 1, flags, strlen(pathname), 0);
 
+	printf("netopen:  %d\n", sockfd);
+
 	// Write the filename to the socket
 	writen(sockfd, (char *)pathname, strlen(pathname));
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
-	// Get status and free command packet
-	int stat = cPack->status;
+	// Get file descriptor index and free command packet
+	int fd = cPack->status;
 	free(cPack);
 
-	// Return status received from server
-	return stat;
+	// Return file descriptor index received from server
+	return fd;
 }
 
 /* NETCLOSE
@@ -246,6 +250,8 @@ int netclose(int fd) {
 
 	// Send command to server
 	writeCommand(sockfd, 2, 0, 0, fd);
+
+	printf("netclose: %d\n", sockfd);
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
@@ -272,7 +278,7 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
 
 	// Read character into buffer
 	readn(sockfd, (char *)buf, nbyte);
-	printf("Client: netread: %s %zd\n", (char *)buf, (size_t)nbyte);
+	printf("Client: netread: %d %s %zd\n", sockfd, (char *)buf, (size_t)nbyte);
 
 	// Receive response from server
 	Command_packet * packet = (Command_packet *)readCommand(sockfd);
@@ -292,7 +298,7 @@ ssize_t netwrite(int fd, const void * buf, size_t nbyte) {
 
 	// Send buffer to be written to server
 	writen(sockfd, (char *)buf, nbyte);
-	printf("Client: netwrite: %s\n", (char *)buf);
+	printf("Client: netwrite: %d %s\n", sockfd, (char *)buf);
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);

@@ -12,7 +12,7 @@
 #include "netclient.h"
 
 #define LOOP_BACK_ADDR "127.0.0.1"
-#define SERVER_IP_ADDR "172.27.203.159"
+#define SERVER_IP_ADDR "172.27.192.169"
 #define IP_SIZE 50
 #define IN_FILENAME_MAX 50
 #define BUFFER_MAX 100
@@ -76,25 +76,34 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Open file
-	int fd = netopen(filename, 0);
-	int fd2 = netopen(filename, 0);
+	int fd = netopen(filename, 0);	// need to add flags
+	int fd2 = netopen(filename, 0);	// need to add flags
 
+	printf("fd:  %d\n", fd);
+	printf("fd2: %d\n", fd2);
+
+	/*
 	netwrite(fd2, message, strlen(message));
 
 	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
 	bzero(buf, BUFFER_MAX);
 
 	netread(fd, buf, BUFFER_MAX);
+	*/
 
 	sleep(6);
 
+	int flag1, flag2;
+	
 	// Close file
-	netclose(fd);
-	netclose(fd2);
+	flag1 = netclose(fd);
+	flag2 = netclose(fd2);
+
+	printf("Flag1: %d\nFlag2: %d\n", flag1, flag2);
 
 	// Free IP address of server
 	free(ip_str);
-	free(buf);
+	//free(buf);
 
 	return 0;
 }
