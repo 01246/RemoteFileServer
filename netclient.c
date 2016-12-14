@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <ifaddrs.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
@@ -70,36 +71,27 @@ int main(int argc, char *argv[]) {
 	get_server_ip(ip_str);
 
 	// Initialize server connection
-	if ((netserverinit("man.cs.rutgers.edu")) < 0) {
+	if ((netserverinit("172.27.199.216")) < 0) {
 		perror("Client");
 		exit(0);
 	}
 
 	// Open file
-	int fd = netopen(filename, 0);	// need to add flags
-	int fd2 = netopen(filename, 0);	// need to add flags
-
-	printf("fd:  %d\n", fd);
-	printf("fd2: %d\n", fd2);
-
-	/*
+	int fd = netopen(filename, O_RDONLY);
+	int fd2 = netopen(filename, O_WRONLY);
+	
 	netwrite(fd2, message, strlen(message));
 
 	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
 	bzero(buf, BUFFER_MAX);
 
 	netread(fd, buf, BUFFER_MAX);
-	*/
-
-	sleep(10);
 
 	int flag1, flag2;
 	
 	// Close file
 	flag1 = netclose(fd);
 	flag2 = netclose(fd2);
-
-	printf("Flag1: %d\nFlag2: %d\n", flag1, flag2);
 
 	// Free IP address of server
 	free(ip_str);

@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <ifaddrs.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -52,6 +53,7 @@ int get_server_ip(char * ip_str) {
 	        // If temp socket address is not the LOOP_BACK_ADDR, copy into ip_str
 	        if (strcmp(LOOP_BACK_ADDR, inet_ntoa(t_sockaddr->sin_addr)) != 0) {
 	        	strcpy(ip_str, inet_ntoa(t_sockaddr->sin_addr));
+	        	printf("%s\n", ip_str);
 	        	break;
 	        }
 	    }
@@ -93,7 +95,7 @@ int executeClientCommands(Thread_data * td) {
 		int i, status, nbytes;
 		int cli_id = client_id;
 		int cmd_type = cPtr->type;
-		// flag ?
+		int flag = cPtr->flag;
 		int wr_size = cPtr->size;
 		int fd_index = cPtr->status;
 
@@ -126,11 +128,28 @@ int executeClientCommands(Thread_data * td) {
 				}
 
 				// Open file
-				fd = fopen(buf, "a+"); // need to be dynamic
+				switch (flag) {
+					case O_RDONLY:
+						fd = fopen(buf, "r");
+						break;
+					case O_WRONLY:
+						fd = fopen(buf, "w");
+						break;
+					case O_RDWR:
+						fd = fopen(buf, "a+");
+						break;
+					default:
+						fd = NULL;
+						break;
+				}
+				
 
 				// Error check file
 				if (fd == NULL) {				
-					printf("ERROR cannot open file:-%s-%d\n", buf, errno);
+					printf("Server cannot open file:-%s-%d\n", buf, errno);
+					writeCommand(*sockfd, 0, errno, 0, -1);
+					free(buf);
+					break;
 				}
 
 				// Loop through array to find first open fd_index
@@ -139,7 +158,7 @@ int executeClientCommands(Thread_data * td) {
 						break;
 					}
 				}
-				printf("Server: netopen  %d %zd %s fd_index:%d\n", cli_id, (size_t)fd, buf, i);
+				printf("Server:   netopen  %d %zd %s fd_index:%d\n", cli_id, (size_t)fd, buf, i);
 
 				// Initialize open file array at corresponding fd_index
 				openFiles[cli_id][i].fp = fd;
@@ -164,7 +183,7 @@ int executeClientCommands(Thread_data * td) {
 
 				// Close file
 				status = fclose(openFiles[cli_id][fd_index].fp);
-				printf("Server: netclose %d %zd status:%d  fd_index:%d\n", 
+				printf("Server:   netclose %d %zd status:%d  fd_index:%d\n", 
 					cli_id, (size_t)openFiles[cli_id][fd_index].fp, status, fd_index);
 
 				// Set file as inactive in open file array
@@ -179,7 +198,7 @@ int executeClientCommands(Thread_data * td) {
 				// Get file descriptor and jump to front of file
 				fd = openFiles[cli_id][fd_index].fp;
 				fseek(fd, 0, SEEK_SET);
-				printf("Server: netread  %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
+				printf("Server:   netread  %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size+1);
@@ -209,7 +228,7 @@ int executeClientCommands(Thread_data * td) {
 
 				// Get file descriptor
 				fd = openFiles[cli_id][fd_index].fp;
-				printf("Server: netwrite %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
+				printf("Server:   netwrite %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
 				bzero(buf, cPtr->size+1);
@@ -232,12 +251,13 @@ int executeClientCommands(Thread_data * td) {
 				writeCommand(*sockfd, 0, 0, 0, wr_size);
 
 				// Free buffer
+				buf-=cPtr->size;
 				free(buf);
 				break;
 
 			default:
 				// tell client to close the socket
-
+				printf("Server:   exit()\n");
 				// Free command packet -- may need a lock
 				free(cPtr);
 				free(buf);

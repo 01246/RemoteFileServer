@@ -3,3 +3,5 @@ Asst3: Remote Files
 Stephen Petrides
 Andrew Macneille
 
+Errors are printed in the string form.
+	HOST_NOT_FOUND: nodename nor servname provided, or not known

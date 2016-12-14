@@ -8,6 +8,7 @@ typedef struct command_packet {
 
 // Macros
 #define SERV_TCP_PORT_STR "9000"
+//#define HOST_NOT_FOUND 132 /* Host was not found in netserverinit */
 
 // Functions
 void * get_in_addr(struct sockaddr *sa);

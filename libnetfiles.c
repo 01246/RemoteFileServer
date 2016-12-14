@@ -40,6 +40,7 @@ int netserverinit(char * hostname) {
     // Declare socket address struct
     struct addrinfo hints, *servinfo, *p;
     char s[INET6_ADDRSTRLEN]; // 46
+    int flag;
 
     // Fill in struct with zeroes
 	bzero((char *)&hints, sizeof(hints));
@@ -49,8 +50,8 @@ int netserverinit(char * hostname) {
     hints.ai_socktype = SOCK_STREAM;		// Sets as TCP
 
     // Automatically initialize the address information from host
-    if (getaddrinfo(hostname, SERV_TCP_PORT_STR, &hints, &servinfo) != 0) {
-        printf("Client: Cannot get server address information\n");
+    if ((flag = getaddrinfo(hostname, SERV_TCP_PORT_STR, &hints, &servinfo)) != 0) {
+        fprintf(stderr, "Client: %s\n", gai_strerror(flag));
         return -1;
     }
 
@@ -64,11 +65,7 @@ int netserverinit(char * hostname) {
 		}
 
 		// Connect to the server
-		//printf("Connecting...");
 		if (connect(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
-
-			// Report error
-			//perror("Client");
 
 			// Close socket
 			close(sockfd);
@@ -82,13 +79,11 @@ int netserverinit(char * hostname) {
 
 	// Check if socket was not bound
 	if (p == NULL) {
-		//perror("Client");
-		//errno = HOST_NOT_FOUND;
 		return -1;
 	}
 
 	// Get IP address from socket address
-	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
+	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof(s));
 	printf("Client: Connected to %s\n", s);
 
 	// Free server information
@@ -123,7 +118,7 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 	iBuf = htonl(status);
 	writen(sockfd, (char *)&iBuf, 4);
 
-	printf("Write type:%d, flag:%d, size:%d, status:%d\n", 
+	printf("Write     type:%d, flag:%d, size:%d, status:%d\n\n", 
 		type, 
 		flag, 
 		size, 
@@ -269,6 +264,7 @@ int netopen(const char * pathname, int flags) {
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
 	// Get file descriptor index and free command packet
+	errno = cPack->flag;
 	int fd = cPack->status;
 	free(cPack);
 
