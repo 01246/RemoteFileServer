@@ -90,6 +90,8 @@ int main(int argc, char *argv[]) {
 		flag1 = netclose(fd);
 	}
 
+	sleep(6);
+
 	if (fd2 > -1) {
 		netwrite(fd2, message, strlen(message));
 		flag2 = netclose(fd2);

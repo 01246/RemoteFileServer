@@ -5,6 +5,8 @@ Andrew Macneille
 
 A client opens a single socket in netserverinit() and uses the global sockfd, initialized in netserverinit() for all net____() function calls. On the server side, this means that each client is one socket and one thread.
 
+netread() assumes that the buffer has valid address with enough room
+
 Errors are printed in the string form.
 *	HOST_NOT_FOUND: nodename nor servname provided, or not known
 *	EACCES: 		Permission denied

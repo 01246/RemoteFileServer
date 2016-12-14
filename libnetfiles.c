@@ -118,14 +118,13 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 	iBuf = htonl(status);
 	writen(sockfd, (char *)&iBuf, 4);
 
-	/*
 	printf("Write     type:%d, flag:%d, size:%d, status:%d\n", 
 		type, 
 		flag, 
 		size, 
 		status
 	);
-	*/
+	
 }
 
 /* READCOMMANDSERVER
@@ -154,14 +153,13 @@ void readCommandServer(int sockfd, Command_packet * packet) {
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
 
-	/*
 	printf("\nReadCommS type:%d, flag:%d, size:%d, status:%d\n", 
 		packet->type, 
 		packet->flag, 
 		packet->size, 
 		packet->status
 	);
-	*/
+	
 }
 
 /* READCOMMAND
@@ -193,14 +191,13 @@ void * readCommand(int sockfd) {
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
 
-	/*
 	printf("Read      type:%d, flag:%d, size:%d, status:%d\n\n", 
 		packet->type, 
 		packet->flag, 
 		packet->size, 
 		packet->status
 	);
-	*/
+	
 
 	return (void *)packet;
 }
@@ -324,9 +321,6 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
 
 	// Send command to server
 	writeCommand(sockfd, 3, 0, nbyte, fd);
-
-	// Allocate memory for buffer
-	buf = malloc(sizeof(nbyte));
 
 	// Read character into buffer
 	readn(sockfd, (char *)buf, nbyte);
