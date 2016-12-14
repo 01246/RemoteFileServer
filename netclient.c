@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
 	netread(fd, buf, BUFFER_MAX);
 	*/
 
-	sleep(6);
+	sleep(10);
 
 	int flag1, flag2;
 	

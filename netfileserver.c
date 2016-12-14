@@ -23,6 +23,7 @@
 
 Open_File_Data openFiles[THREAD_MAX][OPEN_FILES_MAX];
 int client_id = 0;
+pthread_mutex_t m_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* GET_SERVER_IP
  *
@@ -72,15 +73,23 @@ int get_server_ip(char * ip_str) {
  *
  * Take commands across the network and execute.
  */
-int executeClientCommands(int * sockfd) {
-	
-	int j = 0;
+int executeClientCommands(Thread_data * td) {
+
+	// Initialize socket and client ID
+	int * sockfd = td->cli_fd;
+	int client_id = td->client_id;
+
+	// Malloc command packet
+	pthread_mutex_lock(&m_lock);
+	Command_packet * cPtr = (Command_packet *)malloc(sizeof(Command_packet));
+	pthread_mutex_unlock(&m_lock);
+
 	// Loop through incoming client commands
 	while (1) {
-		j++;
 
 		// Receive command packet from client
-		Command_packet * cPtr = (Command_packet *)readCommand(*sockfd);
+		bzero(cPtr, sizeof(Command_packet));
+		readCommandServer(*sockfd, cPtr);
 
 		// Declare and initialize buffers, counters, and file descriptors
 		int i, status, nbytes;
@@ -89,7 +98,10 @@ int executeClientCommands(int * sockfd) {
 		// flag ?
 		int wr_size = cPtr->size;
 		int fd_index = cPtr->status;
+
+		pthread_mutex_lock(&m_lock);
 		char * buf = (char *)malloc(sizeof(char)*(wr_size+1));
+		pthread_mutex_unlock(&m_lock);
 		FILE * fd;
 		
 		/*
@@ -100,9 +112,6 @@ int executeClientCommands(int * sockfd) {
 			cPtr->status
 		);
 		*/
-
-		// Free command packet -- may need a lock
-		free(cPtr);
 
 		switch (cmd_type) {
 			case 1: // Open
@@ -148,8 +157,10 @@ int executeClientCommands(int * sockfd) {
 
 			case 2: // Close
 
+				//
 				if (!openFiles[cli_id][fd_index].isActive) {
-					printf("Server: file not active\n");
+					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
+					writeCommand(*sockfd, 0, 0, 0, -1);
 					break;
 				}				
 
@@ -227,11 +238,17 @@ int executeClientCommands(int * sockfd) {
 				break;
 
 			default:
-				printf("Server: finished reading commands. Closing socket\n");
+				// tell client to close the socket
+
+				// Free command packet -- may need a lock
+				free(cPtr);
+				free(buf);
 				close(*sockfd);
 				return 1;
 		}
 	}
+
+	free(cPtr);
 	return 1;
 }
 
@@ -321,6 +338,7 @@ int main(int argc, char *argv[]) {
 
 	// Initialize thread data
 	pthread_t clientThreads[THREAD_MAX];
+	Thread_data * td[THREAD_MAX];
 	int flag = 0;
 	i = 0;
 
@@ -338,11 +356,14 @@ int main(int argc, char *argv[]) {
 		if (cli_fd < 0) {
 			perror("Server");
 		} else {
-			printf("Server: Connection accepted\n");
+			printf("Server: Connection accepted: %d\n", cli_fd);
+			td[i] = (Thread_data *)malloc(sizeof(Thread_data));
+			td[i]->cli_fd = &cli_fd;
+			td[i]->client_id = client_id;
 		}
 
 		// Open thread for client and pass in client file descriptor
-		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)executeClientCommands, (int *)&cli_fd))) {
+		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)executeClientCommands, (Thread_data *)td[i]))) {
 			printf("Server: pthread_create() error");
 		} else if (flag == 0) {
 			i++;
@@ -355,6 +376,7 @@ int main(int argc, char *argv[]) {
 
 		// Join threads
 		flag = pthread_join(clientThreads[j], NULL);
+		free(td[i]);
 
 		// Erroring checking
 		if (flag) {

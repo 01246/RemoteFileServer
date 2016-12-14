@@ -10,6 +10,7 @@ typedef struct command_packet {
 void * get_in_addr(struct sockaddr *sa);
 int netserverinit(char * hostname);
 void writeCommand(int sockfd, int type, int flag, int size, int status);
+void readCommandServer(int sockfd, Command_packet * packet);
 void *  readCommand(int sockfd);
 int readn(int fd, char * ptr, int nbytes);
 int writen(int fd, char * ptr, int nbytes);

@@ -18,7 +18,6 @@
 #define SERV_HOST_ADDR "127.0.0.1" // Loop back address
 
 int sockfd;
-pthread_mutex_t read_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* GET_IN_ADDR
  *
@@ -127,6 +126,46 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 	iBuf = htonl(status);
 	writen(sockfd, (char *)&iBuf, 4);
 
+	printf("Write type:%d, flag:%d, size:%d, status:%d\n", 
+		type, 
+		flag, 
+		size, 
+		status
+	);
+}
+
+/* READCOMMANDSERVER
+ *
+ * Reads a command from a socket and fills in a packet struct.
+ * Works in tandem with writeCommandServer().
+ */
+void readCommandServer(int sockfd, Command_packet * packet) {
+
+	// Declare integer buffer
+	int iBuf;
+
+	// Get type
+	readn(sockfd, (char *)&iBuf, 4);
+	packet->type = ntohl(iBuf);
+
+	// Get flag
+	readn(sockfd, (char *)&iBuf, 4);
+	packet->flag = ntohl(iBuf);
+
+	// Get size
+	readn(sockfd, (char *)&iBuf, 4);
+	packet->size = ntohl(iBuf);
+
+	// Get status
+	readn(sockfd, (char *)&iBuf, 4);
+	packet->status = ntohl(iBuf);
+
+	printf("ReadCommS type:%d, flag:%d, size:%d, status:%d\n", 
+		packet->type, 
+		packet->flag, 
+		packet->size, 
+		packet->status
+	);
 }
 
 /* READCOMMAND
@@ -140,9 +179,7 @@ void * readCommand(int sockfd) {
 	int iBuf;
 
 	// Allocate memory for command packet struct
-	pthread_mutex_lock(&read_lock);
 	Command_packet * packet = (Command_packet *)malloc(sizeof(Command_packet));
-	pthread_mutex_unlock(&read_lock);
 
 	// Get type
 	readn(sockfd, (char *)&iBuf, 4);
@@ -251,10 +288,10 @@ int netclose(int fd) {
 	// Send command to server
 	writeCommand(sockfd, 2, 0, 0, fd);
 
-	printf("netclose: %d\n", sockfd);
-
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
+
+	printf("netclose: %d\n", sockfd);
 
 	// Get status and free command packet
 	int stat = cPack->status;
