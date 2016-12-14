@@ -14,8 +14,7 @@
 #include "netfileserver.h"
 #include "libnetfiles.h"
 
-#define SERV_TCP_PORT 8001
-#define SERV_TCP_PORT_STR "8001"
+#define SERV_TCP_PORT_STR "9000"
 #define BACKLOG 5
 #define THREAD_MAX 100
 #define LOOP_BACK_ADDR "127.0.0.1"
@@ -53,7 +52,6 @@ int get_server_ip(char * ip_str) {
 	        // If temp socket address is not the LOOP_BACK_ADDR, copy into ip_str
 	        if (strcmp(LOOP_BACK_ADDR, inet_ntoa(t_sockaddr->sin_addr)) != 0) {
 	        	strcpy(ip_str, inet_ntoa(t_sockaddr->sin_addr));
-	        	printf("%s\n", ip_str);
 	        	break;
 	        }
 	    }
@@ -280,6 +278,7 @@ int main(int argc, char *argv[]) {
 	int sockfd, cli_fd; 
 	socklen_t cli_len;
 
+	/*
 	// Check for input error
 	if (argc != 2) {
    		fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -289,6 +288,8 @@ int main(int argc, char *argv[]) {
  	// Initialize port string
  	char port[5];
  	strcpy(port, argv[1]);
+
+ 	*/
 
 	// Declare address information struct
 	struct addrinfo hints, cli_addr, *servinfo, *p;
@@ -301,7 +302,7 @@ int main(int argc, char *argv[]) {
 	hints.ai_socktype = SOCK_STREAM;				// Sets as TCP
 
 	// Automatically initialize address information
-	if (getaddrinfo(ip_str, port, &hints, &servinfo) != 0) {
+	if (getaddrinfo(ip_str, SERV_TCP_PORT_STR, &hints, &servinfo) != 0) {
 		perror("Server");
 		exit(1);
 	}

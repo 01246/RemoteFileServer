@@ -7,6 +7,7 @@
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "libnetfiles.h"
 #include "netclient.h"
@@ -42,7 +43,6 @@ void get_server_ip(char * ip_str) {
 	        // If temp socket address is not the LOOP_BACK_ADDR, copy into ip_str
 	        if (strcmp(LOOP_BACK_ADDR, inet_ntoa(t_sockaddr->sin_addr)) != 0) {
 	        	strcpy(ip_str, inet_ntoa(t_sockaddr->sin_addr));
-	        	printf("%s\n", ip_str);
 	        }
 	    }
 
@@ -70,8 +70,8 @@ int main(int argc, char *argv[]) {
 	get_server_ip(ip_str);
 
 	// Initialize server connection
-	if ((netserverinit(ip_str)) < 0) {
-		printf("Client: Cannot connect\n");
+	if ((netserverinit("man.cs.rutgers.edu")) < 0) {
+		perror("Client");
 		exit(0);
 	}
 

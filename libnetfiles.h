@@ -6,6 +6,9 @@ typedef struct command_packet {
 	int status;		// file descriptor
 } Command_packet;
 
+// Macros
+#define SERV_TCP_PORT_STR "9000"
+
 // Functions
 void * get_in_addr(struct sockaddr *sa);
 int netserverinit(char * hostname);

@@ -13,10 +13,6 @@
 #include "netfileserver.h"
 #include "libnetfiles.h"
 
-#define SERV_TCP_PORT 8001
-#define SERV_TCP_PORT_STR "8001"
-#define SERV_HOST_ADDR "127.0.0.1" // Loop back address
-
 int sockfd;
 
 /* GET_IN_ADDR
@@ -68,11 +64,11 @@ int netserverinit(char * hostname) {
 		}
 
 		// Connect to the server
-		printf("Connecting...");
+		//printf("Connecting...");
 		if (connect(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
 
 			// Report error
-			perror("Client");
+			//perror("Client");
 
 			// Close socket
 			close(sockfd);
@@ -86,7 +82,8 @@ int netserverinit(char * hostname) {
 
 	// Check if socket was not bound
 	if (p == NULL) {
-		perror("Client");
+		//perror("Client");
+		//errno = HOST_NOT_FOUND;
 		return -1;
 	}
 
