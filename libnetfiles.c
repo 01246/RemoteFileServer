@@ -118,7 +118,7 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 	iBuf = htonl(status);
 	writen(sockfd, (char *)&iBuf, 4);
 
-	printf("Write     type:%d, flag:%d, size:%d, status:%d\n\n", 
+	printf("Write     type:%d, flag:%d, size:%d, status:%d\n", 
 		type, 
 		flag, 
 		size, 
@@ -152,7 +152,7 @@ void readCommandServer(int sockfd, Command_packet * packet) {
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
 
-	printf("ReadCommS type:%d, flag:%d, size:%d, status:%d\n", 
+	printf("\nReadCommS type:%d, flag:%d, size:%d, status:%d\n", 
 		packet->type, 
 		packet->flag, 
 		packet->size, 
@@ -188,6 +188,13 @@ void * readCommand(int sockfd) {
 	// Get status
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
+
+	printf("Read      type:%d, flag:%d, size:%d, status:%d\n\n", 
+		packet->type, 
+		packet->flag, 
+		packet->size, 
+		packet->status
+	);
 
 	return (void *)packet;
 }
@@ -266,6 +273,11 @@ int netopen(const char * pathname, int flags) {
 	// Get file descriptor index and free command packet
 	errno = cPack->flag;
 	int fd = cPack->status;
+
+	if (fd < 0) {
+		perror("Client");
+	}
+
 	free(cPack);
 
 	// Return file descriptor index received from server
@@ -281,13 +293,19 @@ int netclose(int fd) {
 	// Send command to server
 	writeCommand(sockfd, 2, 0, 0, fd);
 
+	printf("netclose: %d\n", sockfd);
+
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
-	printf("netclose: %d\n", sockfd);
-
 	// Get status and free command packet
+	errno = cPack->flag;
 	int stat = cPack->status;
+
+	if (fd < 0) {
+		perror("Client");
+	}
+	
 	free(cPack);
 
 	// Return status received from server

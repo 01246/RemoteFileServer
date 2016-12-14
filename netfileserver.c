@@ -15,6 +15,14 @@
 #include "netfileserver.h"
 #include "libnetfiles.h"
 
+typedef struct thread_data {
+	int * cli_fd;
+	int client_id;
+	Command_packet * cPtr;
+} Thread_data;
+
+int executeClientCommands(Thread_data * td);
+
 #define SERV_TCP_PORT_STR "9000"
 #define BACKLOG 5
 #define THREAD_MAX 100
@@ -78,11 +86,7 @@ int executeClientCommands(Thread_data * td) {
 	// Initialize socket and client ID
 	int * sockfd = td->cli_fd;
 	int client_id = td->client_id;
-
-	// Malloc command packet
-	pthread_mutex_lock(&m_lock);
-	Command_packet * cPtr = (Command_packet *)malloc(sizeof(Command_packet));
-	pthread_mutex_unlock(&m_lock);
+	Command_packet * cPtr = td->cPtr;
 
 	// Loop through incoming client commands
 	while (1) {
@@ -146,7 +150,7 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check file
 				if (fd == NULL) {				
-					printf("Server cannot open file:-%s-%d\n", buf, errno);
+					printf("Server cannot open file: %s %d\n", buf, errno);
 					writeCommand(*sockfd, 0, errno, 0, -1);
 					free(buf);
 					break;
@@ -174,14 +178,14 @@ int executeClientCommands(Thread_data * td) {
 
 			case 2: // Close
 
-				//
+				// Check if file is active
 				if (!openFiles[cli_id][fd_index].isActive) {
 					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
-					writeCommand(*sockfd, 0, 0, 0, -1);
+					writeCommand(*sockfd, 0, 9, 0, -1);
 					break;
 				}				
 
-				// Close file
+				// Close active file
 				status = fclose(openFiles[cli_id][fd_index].fp);
 				printf("Server:   netclose %d %zd status:%d  fd_index:%d\n", 
 					cli_id, (size_t)openFiles[cli_id][fd_index].fp, status, fd_index);
@@ -298,19 +302,6 @@ int main(int argc, char *argv[]) {
 	int sockfd, cli_fd; 
 	socklen_t cli_len;
 
-	/*
-	// Check for input error
-	if (argc != 2) {
-   		fprintf(stderr, "usage: %s <port>\n", argv[0]);
-  		exit(1);
- 	}
-
- 	// Initialize port string
- 	char port[5];
- 	strcpy(port, argv[1]);
-
- 	*/
-
 	// Declare address information struct
 	struct addrinfo hints, cli_addr, *servinfo, *p;
 
@@ -381,6 +372,7 @@ int main(int argc, char *argv[]) {
 			td[i] = (Thread_data *)malloc(sizeof(Thread_data));
 			td[i]->cli_fd = &cli_fd;
 			td[i]->client_id = client_id;
+			td[i]->cPtr = (Command_packet *)malloc(sizeof(Command_packet));
 		}
 
 		// Open thread for client and pass in client file descriptor

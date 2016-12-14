@@ -5,3 +5,12 @@ Andrew Macneille
 
 Errors are printed in the string form.
 	HOST_NOT_FOUND: nodename nor servname provided, or not known
+	EACCES: 		Permission denied
+	EISDIR: 		Is a directory
+	ENOENT: 		No such file or directory
+	EROFS:			Read-only file system
+*	ENFILE:			File table overflow - the client has reached the open file limit
+*	EAGAIN:			Resource temporarily unavailible (EWOULDBLOCK)
+*	EPERM:			Operation not permitted
+	
+	EBADF:			Bad file descriptor
