@@ -17,7 +17,7 @@
 #define SERVER_IP_ADDR "172.27.192.169"
 #define IP_SIZE 50
 #define IN_FILENAME_MAX 50
-#define BUFFER_MAX 100
+#define BUFFER_MAX 50
 
 /* GET_SERVER_IP
  *
@@ -77,8 +77,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Open file
-	int fd = netopen(filename, O_RDONLY);
-	int fd2 = netopen(filename, O_WRONLY);
+	int fd = netopen("file0.txt", O_WRONLY);
+	int fd2 = netopen("file1.txt", O_RDONLY);
 
 	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
 	
@@ -87,14 +87,12 @@ int main(int argc, char *argv[]) {
 	if (fd > -1) {
 		bzero(buf, BUFFER_MAX);
 		netread(fd, buf, BUFFER_MAX);
-		flag1 = netclose(fd2);
-		printf("Client close: %d\n", flag1);
+		flag1 = netclose(fd);
 	}
 
 	if (fd2 > -1) {
 		netwrite(fd2, message, strlen(message));
-		flag2 = netclose(fd);
-		printf("Client close: %d\n", flag2);
+		flag2 = netclose(fd2);
 	}
 
 	// Free IP address of server

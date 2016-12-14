@@ -3,14 +3,18 @@ Asst3: Remote Files
 Stephen Petrides
 Andrew Macneille
 
+A client opens a single socket in netserverinit() and uses the global sockfd, initialized in netserverinit() for all net____() function calls. On the server side, this means that each client is one socket and one thread.
+
 Errors are printed in the string form.
-	HOST_NOT_FOUND: nodename nor servname provided, or not known
-	EACCES: 		Permission denied
-	EISDIR: 		Is a directory
-	ENOENT: 		No such file or directory
-	EROFS:			Read-only file system
-*	ENFILE:			File table overflow - the client has reached the open file limit
-*	EAGAIN:			Resource temporarily unavailible (EWOULDBLOCK)
-*	EPERM:			Operation not permitted
-	
-	EBADF:			Bad file descriptor
+*	HOST_NOT_FOUND: nodename nor servname provided, or not known
+*	EACCES: 		Permission denied
+*	EISDIR: 		Is a directory
+*	ENOENT: 		No such file or directory
+*	EROFS:			Read-only file system
+-	ENFILE:			File table overflow - the client has reached the open file limit
+-	EAGAIN:			Resource temporarily unavailible (EWOULDBLOCK)
+-	EPERM:			Operation not permitted
+
+*	EBADF:			Bad file descriptor
+?	ECONNRESET:		Connection reset by peer
+?	ETIMEOUT:		???

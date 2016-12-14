@@ -107,15 +107,6 @@ int executeClientCommands(Thread_data * td) {
 		char * buf = (char *)malloc(sizeof(char)*(wr_size+1));
 		pthread_mutex_unlock(&m_lock);
 		FILE * fd;
-		
-		/*
-		printf("Received type:%d, flag:%d, size:%d, status:%d\n", 
-			cPtr->type, 
-			cPtr->flag, 
-			cPtr->size, 
-			cPtr->status
-		);
-		*/
 
 		switch (cmd_type) {
 			case 1: // Open
@@ -199,16 +190,23 @@ int executeClientCommands(Thread_data * td) {
 
 			case 3: // Read
 
+				// Check if file is active
+				if (!openFiles[cli_id][fd_index].isActive) {
+					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
+					writeCommand(*sockfd, 0, 9, -1, 0);
+					break;
+				}
+
 				// Get file descriptor and jump to front of file
 				fd = openFiles[cli_id][fd_index].fp;
 				fseek(fd, 0, SEEK_SET);
 				printf("Server:   netread  %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
-				bzero(buf, cPtr->size+1);
+				bzero(buf, wr_size+1);
 				
 				// Read one byte at time from file across the network
-				for (i = 0; i < cPtr->size && !feof(fd); i++) {
+				for (i = 0; i < wr_size && !feof(fd); i++) {
 					buf[i] = fgetc(fd);
 				}
 
@@ -216,7 +214,7 @@ int executeClientCommands(Thread_data * td) {
 				nbytes = writen(*sockfd, buf, wr_size);
 
 				// Error check writen
-				if (nbytes != cPtr->size){
+				if (nbytes != wr_size){
 					printf("ERROR writing buffer\n");
 				}
 
@@ -230,32 +228,39 @@ int executeClientCommands(Thread_data * td) {
 
 			case 4: // Write
 
+				// Check if file is active
+				if (!openFiles[cli_id][fd_index].isActive) {
+					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
+					writeCommand(*sockfd, 0, 9, -1, 0);
+					break;
+				}
+
 				// Get file descriptor
 				fd = openFiles[cli_id][fd_index].fp;
 				printf("Server:   netwrite %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
-				bzero(buf, cPtr->size+1);
+				bzero(buf, wr_size+1);
 
 				// Read the bytes to be written from the client
 				nbytes = readn(*sockfd, buf, wr_size);
 
 				// Error check readn
-				if (nbytes != cPtr->size){
+				if (nbytes != wr_size){
 					printf("ERROR writing buffer\n");
 				}
 
 				// Write one byte at time from file across the network
-				for (i = 0; i < cPtr->size; i++, buf++) {
+				for (i = 0; i < wr_size; i++, buf++) {
 					fputc(*buf, fd);
 					fflush(fd);
 				}
 
 				// Send message to client
-				writeCommand(*sockfd, 0, 0, 0, wr_size);
+				writeCommand(*sockfd, 0, 0, wr_size, 0);
 
 				// Free buffer
-				buf-=cPtr->size;
+				buf-=wr_size;
 				free(buf);
 				break;
 
@@ -389,6 +394,7 @@ int main(int argc, char *argv[]) {
 
 		// Join threads
 		flag = pthread_join(clientThreads[j], NULL);
+		free(td[i]->cPtr);
 		free(td[i]);
 
 		// Erroring checking

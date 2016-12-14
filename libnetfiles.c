@@ -118,12 +118,14 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 	iBuf = htonl(status);
 	writen(sockfd, (char *)&iBuf, 4);
 
+	/*
 	printf("Write     type:%d, flag:%d, size:%d, status:%d\n", 
 		type, 
 		flag, 
 		size, 
 		status
 	);
+	*/
 }
 
 /* READCOMMANDSERVER
@@ -152,12 +154,14 @@ void readCommandServer(int sockfd, Command_packet * packet) {
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
 
+	/*
 	printf("\nReadCommS type:%d, flag:%d, size:%d, status:%d\n", 
 		packet->type, 
 		packet->flag, 
 		packet->size, 
 		packet->status
 	);
+	*/
 }
 
 /* READCOMMAND
@@ -189,12 +193,14 @@ void * readCommand(int sockfd) {
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
 
+	/*
 	printf("Read      type:%d, flag:%d, size:%d, status:%d\n\n", 
 		packet->type, 
 		packet->flag, 
 		packet->size, 
 		packet->status
 	);
+	*/
 
 	return (void *)packet;
 }
@@ -262,7 +268,7 @@ int netopen(const char * pathname, int flags) {
 	// Send command to server
 	writeCommand(sockfd, 1, flags, strlen(pathname), 0);
 
-	printf("netopen:  %d\n", sockfd);
+	printf("Client: netopen:  %d\n", sockfd);
 
 	// Write the filename to the socket
 	writen(sockfd, (char *)pathname, strlen(pathname));
@@ -273,12 +279,11 @@ int netopen(const char * pathname, int flags) {
 	// Get file descriptor index and free command packet
 	errno = cPack->flag;
 	int fd = cPack->status;
+	free(cPack);
 
 	if (fd < 0) {
 		perror("Client");
 	}
-
-	free(cPack);
 
 	// Return file descriptor index received from server
 	return fd;
@@ -293,7 +298,7 @@ int netclose(int fd) {
 	// Send command to server
 	writeCommand(sockfd, 2, 0, 0, fd);
 
-	printf("netclose: %d\n", sockfd);
+	printf("Client: netclose: %d\n", sockfd);
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
@@ -301,12 +306,11 @@ int netclose(int fd) {
 	// Get status and free command packet
 	errno = cPack->flag;
 	int stat = cPack->status;
+	free(cPack);
 
-	if (fd < 0) {
+	if (stat < 0) {
 		perror("Client");
 	}
-	
-	free(cPack);
 
 	// Return status received from server
 	return stat;
@@ -326,13 +330,23 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
 
 	// Read character into buffer
 	readn(sockfd, (char *)buf, nbyte);
-	printf("Client: netread: %d %s %zd\n", sockfd, (char *)buf, (size_t)nbyte);
+	printf("Client: netread:  %d %s %zd\n", sockfd, (char *)buf, (size_t)nbyte);
 
 	// Receive response from server
-	Command_packet * packet = (Command_packet *)readCommand(sockfd);
+	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
+
+	// Get status and free command packet
+	int size = cPack->size;
+	errno = cPack->flag;
+	free(cPack);
+
+	// Check if the number of bytes read is correct
+	if (size != nbyte) {
+		perror("Client");
+	}
 
 	// Return size of read from server
-	return packet->size;
+	return size;
 }
 
 /* NETWRITE
@@ -352,9 +366,15 @@ ssize_t netwrite(int fd, const void * buf, size_t nbyte) {
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
 
 	// Get status and free command packet
-	int stat = cPack->status;
+	int size = cPack->size;
+	errno = cPack->flag;
 	free(cPack);
 
+	// Check if the number of bytes written is correct
+	if (size != nbyte) {
+		perror("Client");
+	}
+
 	// Return status received from server
-	return stat;
+	return size;
 }
