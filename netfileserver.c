@@ -122,7 +122,7 @@ int executeClientCommands(Thread_data * td) {
 					printf("ERROR reading filename\n");
 				}
 
-				// Open file
+				// Open file according to flag
 				switch (flag) {
 					case O_RDONLY:
 						fd = fopen(buf, "r");
@@ -251,8 +251,8 @@ int executeClientCommands(Thread_data * td) {
 				}
 
 				// Write one byte at time from file across the network
-				for (i = 0; i < wr_size; i++, buf++) {
-					fputc(*buf, fd);
+				for (i = 0; i < wr_size; i++) {
+					fputc(buf[i], fd);
 					fflush(fd);
 				}
 
@@ -260,22 +260,17 @@ int executeClientCommands(Thread_data * td) {
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
 
 				// Free buffer
-				buf-=wr_size;
 				free(buf);
 				break;
 
 			default:
 				// tell client to close the socket
 				printf("Server:   exit()\n");
-				// Free command packet -- may need a lock
-				free(cPtr);
 				free(buf);
 				close(*sockfd);
 				return 1;
 		}
 	}
-
-	free(cPtr);
 	return 1;
 }
 
