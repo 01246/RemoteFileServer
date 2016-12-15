@@ -124,7 +124,6 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 		size, 
 		status
 	);
-	
 }
 
 /* READCOMMANDSERVER
@@ -198,7 +197,6 @@ void * readCommand(int sockfd) {
 		packet->status
 	);
 	
-
 	return (void *)packet;
 }
 
@@ -298,7 +296,9 @@ int netclose(int fd) {
 	printf("Client: netclose: %d\n", sockfd);
 
 	// Receive response from server
+	printf("Client: before read\n");
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
+	printf("Client: after read\n");
 
 	// Get status and free command packet
 	errno = cPack->flag;
@@ -327,7 +327,9 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
 	printf("Client: netread:  %d %s %zd\n", sockfd, (char *)buf, (size_t)nbyte);
 
 	// Receive response from server
+	printf("Client: before read\n");
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
+	printf("Client: after read\n");
 
 	// Get status and free command packet
 	int size = cPack->size;

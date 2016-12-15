@@ -78,28 +78,27 @@ int main(int argc, char *argv[]) {
 
 	// Open file
 	int fd = netopen("file0.txt", O_WRONLY);
-	int fd2 = netopen("file1.txt", O_RDONLY);
+	//int fd2 = netopen("file1.txt", O_RDONLY);
 
-	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
+	//char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
 	
-	int flag1, flag2;
+	int flag1;
+
+	sleep(5);
 
 	if (fd > -1) {
-		bzero(buf, BUFFER_MAX);
-		netread(fd, buf, BUFFER_MAX);
+		//netread(fd, buf, BUFFER_MAX);
 		flag1 = netclose(fd);
 	}
 
-	sleep(6);
-
-	if (fd2 > -1) {
-		netwrite(fd2, message, strlen(message));
-		flag2 = netclose(fd2);
-	}
+	//if (fd2 > -1) {
+		//netwrite(fd2, message, strlen(message));
+	//	flag2 = netclose(fd2);
+	//}
 
 	// Free IP address of server
 	free(ip_str);
-	free(buf);
+	//free(buf);
 
 	return 0;
 }

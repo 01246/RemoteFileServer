@@ -103,10 +103,23 @@ int executeClientCommands(Thread_data * td) {
 		int wr_size = cPtr->size;
 		int fd_index = cPtr->status;
 
+		if (fd_index < 0 || fd_index > OPEN_FILES_MAX-1) {
+			printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
+			writeCommand(*sockfd, 0, 9, -1, -1);
+			break;
+		}
+
 		pthread_mutex_lock(&m_lock);
 		char * buf = (char *)malloc(sizeof(char)*(wr_size+1));
 		pthread_mutex_unlock(&m_lock);
 		FILE * fd;
+
+		printf("Server    type:%d, flag:%d, size:%d, status:%d\n\n", 
+			cPtr->type, 
+			cPtr->flag, 
+			cPtr->size, 
+			cPtr->status
+		);
 
 		switch (cmd_type) {
 			case 1: // Open
@@ -138,7 +151,6 @@ int executeClientCommands(Thread_data * td) {
 						break;
 				}
 				
-
 				// Error check file
 				if (fd == NULL) {				
 					printf("Server cannot open file: %s %d\n", buf, errno);
@@ -174,7 +186,7 @@ int executeClientCommands(Thread_data * td) {
 					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
 					writeCommand(*sockfd, 0, 9, 0, -1);
 					break;
-				}				
+				}	
 
 				// Close active file
 				status = fclose(openFiles[cli_id][fd_index].fp);
@@ -257,7 +269,11 @@ int executeClientCommands(Thread_data * td) {
 				}
 
 				// Send message to client
+				errno = 0;
+				printf("Server:   before write\n");
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
+				printf("Server:   after write\n");
+				perror("Server");
 
 				// Free buffer
 				free(buf);
@@ -265,7 +281,7 @@ int executeClientCommands(Thread_data * td) {
 
 			default:
 				// tell client to close the socket
-				printf("Server:   exit()\n");
+				printf("Server:   exit() %d\n", cli_id);
 				free(buf);
 				close(*sockfd);
 				return 1;
