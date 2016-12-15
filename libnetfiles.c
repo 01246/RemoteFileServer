@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -34,8 +35,6 @@ void * get_in_addr(struct sockaddr * sa) {
  * It makes sure your library attaches the file connection mode to every net file command a library sends.
  */
 int netserverinit(char * hostname) {
-
-	printf("Init connection: %s\n", hostname);
 
     // Declare socket address struct
     struct addrinfo hints, *servinfo, *p;
@@ -71,7 +70,6 @@ int netserverinit(char * hostname) {
 			close(sockfd);
 			continue;
 		}
-		printf("Connected\n");
 
 		// Successful connection
 		break;
@@ -84,7 +82,6 @@ int netserverinit(char * hostname) {
 
 	// Get IP address from socket address
 	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof(s));
-	printf("Client: Connected to %s\n", s);
 
 	// Free server information
 	freeaddrinfo(servinfo);
@@ -117,13 +114,6 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
 	// Write in status
 	iBuf = htonl(status);
 	writen(sockfd, (char *)&iBuf, 4);
-
-	printf("Write     type:%d, flag:%d, size:%d, status:%d\n", 
-		type, 
-		flag, 
-		size, 
-		status
-	);
 }
 
 /* READCOMMANDSERVER
@@ -151,14 +141,6 @@ void readCommandServer(int sockfd, Command_packet * packet) {
 	// Get status
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
-
-	printf("\nReadCommS type:%d, flag:%d, size:%d, status:%d\n", 
-		packet->type, 
-		packet->flag, 
-		packet->size, 
-		packet->status
-	);
-	
 }
 
 /* READCOMMAND
@@ -189,13 +171,6 @@ void * readCommand(int sockfd) {
 	// Get status
 	readn(sockfd, (char *)&iBuf, 4);
 	packet->status = ntohl(iBuf);
-
-	printf("Read      type:%d, flag:%d, size:%d, status:%d\n\n", 
-		packet->type, 
-		packet->flag, 
-		packet->size, 
-		packet->status
-	);
 	
 	return (void *)packet;
 }
@@ -263,10 +238,13 @@ int netopen(const char * pathname, int flags) {
 	// Send command to server
 	writeCommand(sockfd, 1, flags, strlen(pathname), 0);
 
-	printf("Client: netopen:  %d\n", sockfd);
-
 	// Write the filename to the socket
+	errno = 0;
 	writen(sockfd, (char *)pathname, strlen(pathname));
+	if (errno != 0) {
+		perror("Client");
+		errno = 0;
+	}
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
@@ -293,14 +271,11 @@ int netclose(int fd) {
 	// Send command to server
 	writeCommand(sockfd, 2, 0, 0, fd);
 
-	printf("Client: netclose: %d\n", sockfd);
-
 	// Receive response from server
-	printf("Client: before read\n");
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
-	printf("Client: after read\n");
 
 	// Get status and free command packet
+	errno = 0;
 	errno = cPack->flag;
 	int stat = cPack->status;
 	free(cPack);
@@ -323,13 +298,15 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
 	writeCommand(sockfd, 3, 0, nbyte, fd);
 
 	// Read character into buffer
+	errno = 0;
 	readn(sockfd, (char *)buf, nbyte);
-	printf("Client: netread:  %d %s %zd\n", sockfd, (char *)buf, (size_t)nbyte);
+	if (errno != 0) {
+		perror("Client");
+		errno = 0;
+	}
 
 	// Receive response from server
-	printf("Client: before read\n");
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);
-	printf("Client: after read\n");
 
 	// Get status and free command packet
 	int size = cPack->size;
@@ -355,8 +332,12 @@ ssize_t netwrite(int fd, const void * buf, size_t nbyte) {
 	writeCommand(sockfd, 4, 0, nbyte, fd);
 
 	// Send buffer to be written to server
+	errno = 0;
 	writen(sockfd, (char *)buf, nbyte);
-	printf("Client: netwrite: %d %s\n", sockfd, (char *)buf);
+	if (errno != 0) {
+		perror("Client");
+		errno = 0;
+	}
 
 	// Receive response from server
 	Command_packet * cPack = (Command_packet *)readCommand(sockfd);

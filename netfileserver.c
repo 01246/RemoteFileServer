@@ -104,7 +104,6 @@ int executeClientCommands(Thread_data * td) {
 		int fd_index = cPtr->status;
 
 		if (fd_index < 0 || fd_index > OPEN_FILES_MAX-1) {
-			printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
 			writeCommand(*sockfd, 0, 9, -1, -1);
 			break;
 		}
@@ -113,13 +112,6 @@ int executeClientCommands(Thread_data * td) {
 		char * buf = (char *)malloc(sizeof(char)*(wr_size+1));
 		pthread_mutex_unlock(&m_lock);
 		FILE * fd;
-
-		printf("Server    type:%d, flag:%d, size:%d, status:%d\n\n", 
-			cPtr->type, 
-			cPtr->flag, 
-			cPtr->size, 
-			cPtr->status
-		);
 
 		switch (cmd_type) {
 			case 1: // Open
@@ -131,8 +123,10 @@ int executeClientCommands(Thread_data * td) {
 				nbytes = readn(*sockfd, buf, wr_size);
 
 				// Error check readn
-				if (nbytes != wr_size){
-					printf("ERROR reading filename\n");
+				if (nbytes != wr_size) {
+					writeCommand(*sockfd, 0, errno, 0, -1);
+					free(buf);
+					break;
 				}
 
 				// Open file according to flag
@@ -152,8 +146,7 @@ int executeClientCommands(Thread_data * td) {
 				}
 				
 				// Error check file
-				if (fd == NULL) {				
-					printf("Server cannot open file: %s %d\n", buf, errno);
+				if (fd == NULL) {
 					writeCommand(*sockfd, 0, errno, 0, -1);
 					free(buf);
 					break;
@@ -165,7 +158,6 @@ int executeClientCommands(Thread_data * td) {
 						break;
 					}
 				}
-				printf("Server:   netopen  %d %zd %s fd_index:%d\n", cli_id, (size_t)fd, buf, i);
 
 				// Initialize open file array at corresponding fd_index
 				openFiles[cli_id][i].fp = fd;
@@ -183,15 +175,12 @@ int executeClientCommands(Thread_data * td) {
 
 				// Check if file is active
 				if (!openFiles[cli_id][fd_index].isActive) {
-					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
 					writeCommand(*sockfd, 0, 9, 0, -1);
 					break;
 				}	
 
 				// Close active file
 				status = fclose(openFiles[cli_id][fd_index].fp);
-				printf("Server:   netclose %d %zd status:%d  fd_index:%d\n", 
-					cli_id, (size_t)openFiles[cli_id][fd_index].fp, status, fd_index);
 
 				// Set file as inactive in open file array
 				openFiles[cli_id][fd_index].isActive = 0;
@@ -204,7 +193,6 @@ int executeClientCommands(Thread_data * td) {
 
 				// Check if file is active
 				if (!openFiles[cli_id][fd_index].isActive) {
-					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
 					writeCommand(*sockfd, 0, 9, -1, 0);
 					break;
 				}
@@ -212,7 +200,6 @@ int executeClientCommands(Thread_data * td) {
 				// Get file descriptor and jump to front of file
 				fd = openFiles[cli_id][fd_index].fp;
 				fseek(fd, 0, SEEK_SET);
-				printf("Server:   netread  %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
 				bzero(buf, wr_size+1);
@@ -227,7 +214,8 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check writen
 				if (nbytes != wr_size){
-					printf("ERROR writing buffer\n");
+					writeCommand(*sockfd, 0, errno, -1, 0);
+					break;
 				}
 
 				// Send message to client
@@ -242,14 +230,12 @@ int executeClientCommands(Thread_data * td) {
 
 				// Check if file is active
 				if (!openFiles[cli_id][fd_index].isActive) {
-					printf("Server: file not active: [%d][%d]\n", cli_id, fd_index);
 					writeCommand(*sockfd, 0, 9, -1, 0);
 					break;
 				}
 
 				// Get file descriptor
 				fd = openFiles[cli_id][fd_index].fp;
-				printf("Server:   netwrite %d %zd size:%d\n", cli_id, (size_t)fd, wr_size);
 
 				// Zero out buffer
 				bzero(buf, wr_size+1);
@@ -259,7 +245,8 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check readn
 				if (nbytes != wr_size){
-					printf("ERROR writing buffer\n");
+					writeCommand(*sockfd, 0, errno, -1, 0);
+					break;
 				}
 
 				// Write one byte at time from file across the network
@@ -269,11 +256,7 @@ int executeClientCommands(Thread_data * td) {
 				}
 
 				// Send message to client
-				errno = 0;
-				printf("Server:   before write\n");
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
-				printf("Server:   after write\n");
-				perror("Server");
 
 				// Free buffer
 				free(buf);
@@ -281,7 +264,6 @@ int executeClientCommands(Thread_data * td) {
 
 			default:
 				// tell client to close the socket
-				printf("Server:   exit() %d\n", cli_id);
 				free(buf);
 				close(*sockfd);
 				return 1;
@@ -372,7 +354,6 @@ int main(int argc, char *argv[]) {
 
 	// Sits on accept, waiting for new clients
 	while (i < THREAD_MAX) {
-		printf("Listening...\n");
 
 		// Initialize client socket size
 		cli_len = sizeof(cli_addr);
@@ -384,7 +365,6 @@ int main(int argc, char *argv[]) {
 		if (cli_fd < 0) {
 			perror("Server");
 		} else {
-			printf("Server: Connection accepted: %d\n", cli_fd);
 			td[i] = (Thread_data *)malloc(sizeof(Thread_data));
 			td[i]->cli_fd = &cli_fd;
 			td[i]->client_id = client_id;
@@ -393,7 +373,7 @@ int main(int argc, char *argv[]) {
 
 		// Open thread for client and pass in client file descriptor
 		if ((flag = pthread_create(&clientThreads[i], NULL, (void *)executeClientCommands, (Thread_data *)td[i]))) {
-			printf("Server: pthread_create() error");
+			continue;
 		} else if (flag == 0) {
 			i++;
 			client_id++;

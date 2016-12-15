@@ -88,11 +88,11 @@ int main(int argc, char *argv[]) {
 
 	if (fd > -1) {
 		//netread(fd, buf, BUFFER_MAX);
+		netwrite(fd, message, strlen(message));
 		flag1 = netclose(fd);
 	}
 
 	//if (fd2 > -1) {
-		//netwrite(fd2, message, strlen(message));
 	//	flag2 = netclose(fd2);
 	//}
 

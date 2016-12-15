@@ -18,5 +18,5 @@ Errors are printed in the string form.
 -	EPERM:			Operation not permitted
 
 *	EBADF:			Bad file descriptor
-?	ECONNRESET:		Connection reset by peer
-?	ETIMEOUT:		???
+*	ECONNRESET:		Connection reset by peer
+*	ETIMEOUT:		???
