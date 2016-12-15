@@ -3,20 +3,19 @@ Asst3: Remote Files
 Stephen Petrides
 Andrew Macneille
 
-A client opens a single socket in netserverinit() and uses the global sockfd, initialized in netserverinit() for all net____() function calls. On the server side, this means that each client is one socket and one thread.
+Summary
 
-netread() assumes that the buffer has valid address with enough room
+A client opens a single socket in netserverinit() and uses the global sockfd, which is initialized in netserverinit() for all net____() function calls. On the server side, this means that each client is one socket and one thread. The server maintains an array of file descriptors for each client (socket) and returns their index so that the client can keep track of the open files.
 
-Errors are printed in the string form.
+Instructions and buffers are passed across the socket using a Command_packet struct and the read() and write() system calls. If our server encounters an instruction that does not match our interface, the server assumes that there are no remaining instructions. Therefore, the socket is closed and the thread is exited.
+
+Our server uses a listening socket to continually accept multiple clients. The server will shutdown after 100 clients have connected. The server uses the port 9000. This port is hardcoded into the libnetfiles.c and netfileserver.c.
+
+Errors are printed in the string form by the libnetfiles.c
 *	HOST_NOT_FOUND: nodename nor servname provided, or not known
 *	EACCES: 		Permission denied
 *	EISDIR: 		Is a directory
 *	ENOENT: 		No such file or directory
 *	EROFS:			Read-only file system
--	ENFILE:			File table overflow - the client has reached the open file limit
--	EAGAIN:			Resource temporarily unavailible (EWOULDBLOCK)
--	EPERM:			Operation not permitted
-
 *	EBADF:			Bad file descriptor
 *	ECONNRESET:		Connection reset by peer
-*	ETIMEOUT:		???
