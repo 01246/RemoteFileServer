@@ -11,27 +11,41 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "netfileserver.h"
 #include "libnetfiles.h"
 
+// Structs
 typedef struct thread_data {
 	int * cli_fd;
 	int client_id;
 	Command_packet * cPtr;
 } Thread_data;
 
+// Functions
 int executeClientCommands(Thread_data * td);
 
-#define SERV_TCP_PORT_STR "9000"
+// Macros
+#define SERV_TCP_PORT "9000"
 #define BACKLOG 5
 #define THREAD_MAX 100
 #define LOOP_BACK_ADDR "127.0.0.1"
 #define OPEN_FILES_MAX 100
 
+// Globals
 Open_File_Data openFiles[THREAD_MAX][OPEN_FILES_MAX];
 int client_id = 0;
 pthread_mutex_t m_lock = PTHREAD_MUTEX_INITIALIZER;
+sig_atomic_t serv_sockfd;
+
+/* INTHANDLER
+ *
+ * Signal handler for SIGINT
+ */
+void intHandler(int signum) {
+	fcntl(serv_sockfd, F_SETFL, O_NONBLOCK);
+}
 
 /* GET_SERVER_IP
  *
@@ -124,6 +138,7 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check readn
 				if (nbytes != wr_size) {
+					printf("%d\n", *sockfd);
 					writeCommand(*sockfd, 0, errno, 0, -1);
 					free(buf);
 					break;
@@ -164,6 +179,7 @@ int executeClientCommands(Thread_data * td) {
 				openFiles[cli_id][i].isActive = 1;
 
 				// Send response to client
+				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, 0, i);
 
 				// Free buffer
@@ -186,6 +202,7 @@ int executeClientCommands(Thread_data * td) {
 				openFiles[cli_id][fd_index].isActive = 0;
 				
 				// Send message to client
+				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, 0, status);
 				break;
 
@@ -214,11 +231,13 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check writen
 				if (nbytes != wr_size){
+					printf("%d\n", *sockfd);
 					writeCommand(*sockfd, 0, errno, -1, 0);
 					break;
 				}
 
 				// Send message to client
+				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
 
 				// Free buffer
@@ -245,6 +264,7 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check readn
 				if (nbytes != wr_size){
+					printf("%d\n", *sockfd);
 					writeCommand(*sockfd, 0, errno, -1, 0);
 					break;
 				}
@@ -256,6 +276,7 @@ int executeClientCommands(Thread_data * td) {
 				}
 
 				// Send message to client
+				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
 
 				// Free buffer
@@ -280,6 +301,9 @@ int executeClientCommands(Thread_data * td) {
  */
 int main(int argc, char *argv[]) {
 
+	// Initialize signal handler
+	signal(SIGINT, intHandler);
+
 	// Initialize openFiles array
 	int i, j;
 	for (i = 0; i < THREAD_MAX; i++) {
@@ -297,7 +321,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Declare socket descriptors and client length
-	int sockfd, cli_fd; 
+	int cli_fd; 
 	socklen_t cli_len;
 
 	// Declare address information struct
@@ -311,7 +335,7 @@ int main(int argc, char *argv[]) {
 	hints.ai_socktype = SOCK_STREAM;				// Sets as TCP
 
 	// Automatically initialize address information
-	if (getaddrinfo(ip_str, SERV_TCP_PORT_STR, &hints, &servinfo) != 0) {
+	if (getaddrinfo(ip_str, SERV_TCP_PORT, &hints, &servinfo) != 0) {
 		perror("Server");
 		exit(1);
 	}
@@ -320,12 +344,12 @@ int main(int argc, char *argv[]) {
 	for (p = servinfo; p != NULL; p = p->ai_next) {
 
 		// Attempt to open socket with address information
-		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) {
+		if ((serv_sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) {
 			continue;
 		}
 
 		// Binds server socket to a specific port to prepare for listen()
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) < 0) {
+		if (bind(serv_sockfd, p->ai_addr, p->ai_addrlen) < 0) {
 			continue;
 		}
 
@@ -341,8 +365,8 @@ int main(int argc, char *argv[]) {
 	// Free server information
 	freeaddrinfo(servinfo);
 
-	// Server waits for incoming connection requestions; sockfd will be the socket to satisfy these requests
-	if (listen(sockfd, BACKLOG) < 0) {
+	// Server waits for incoming connection requestions; serv_sockfd will be the socket to satisfy these requests
+	if (listen(serv_sockfd, BACKLOG) < 0) {
 		perror("Server");
 	}
 
@@ -359,11 +383,11 @@ int main(int argc, char *argv[]) {
 		cli_len = sizeof(cli_addr);
 
 		// Accept client socket
-		cli_fd = accept(sockfd, (struct sockaddr *) &cli_addr, &cli_len);
+		cli_fd = accept(serv_sockfd, (struct sockaddr *) &cli_addr, &cli_len);
 
 		// Error check accept()
 		if (cli_fd < 0) {
-			perror("Server");
+			break;
 		} else {
 			td[i] = (Thread_data *)malloc(sizeof(Thread_data));
 			td[i]->cli_fd = &cli_fd;
@@ -385,7 +409,6 @@ int main(int argc, char *argv[]) {
 
 		// Join threads
 		flag = pthread_join(clientThreads[j], NULL);
-		free(td[i]->cPtr);
 		free(td[i]);
 
 		// Erroring checking
@@ -396,6 +419,9 @@ int main(int argc, char *argv[]) {
 
 	// Free IP address of server
 	free(ip_str);
+
+	// Close socket
+	close(serv_sockfd);
 
 	return 0;
 }

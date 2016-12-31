@@ -14,8 +14,6 @@
 #include "netfileserver.h"
 #include "libnetfiles.h"
 
-int sockfd;
-
 /* GET_IN_ADDR
  *
  * Returns the correct IP address (IPv4 or IPv6)
@@ -39,7 +37,7 @@ int netserverinit(char * hostname) {
     // Declare socket address struct
     struct addrinfo hints, *servinfo, *p;
     char s[INET6_ADDRSTRLEN]; // 46
-    int flag;
+    int sockfd, flag;
 
     // Fill in struct with zeroes
 	bzero((char *)&hints, sizeof(hints));
@@ -86,7 +84,7 @@ int netserverinit(char * hostname) {
 	// Free server information
 	freeaddrinfo(servinfo);
 
-	return 0;
+	return sockfd;
 }
 
 /* WRITECOMMAND
@@ -94,26 +92,19 @@ int netserverinit(char * hostname) {
  * Encodes a command from host to network and write across a socket.
  * Works in tandem with readCommand().
  */
-void writeCommand(int sockfd, int type, int flag, int size, int status) {
+void writeCommand(int s_fd, int type, int flag, int size, int status) {
+
+	printf("writ: %d\n", s_fd);
 
 	// Declare integer buffer
-	int iBuf;
+	int iBuf[4];
 
-	// Write in type
-	iBuf = htonl(type);
-	writen(sockfd, (char *)&iBuf, 4);
-
-	// Write in flag
-	iBuf = htonl(flag);
-	writen(sockfd, (char *)&iBuf, 4);
-
-	// Write in size
-	iBuf = htonl(size);
-	writen(sockfd, (char *)&iBuf, 4);
-
-	// Write in status
-	iBuf = htonl(status);
-	writen(sockfd, (char *)&iBuf, 4);
+	// Write in packet
+	iBuf[0] = htonl(type);
+	iBuf[1] = htonl(flag);
+	iBuf[2] = htonl(size);
+	iBuf[3] = htonl(status);
+	writen(s_fd, (char *)&iBuf, 16);
 }
 
 /* READCOMMANDSERVER
@@ -123,24 +114,17 @@ void writeCommand(int sockfd, int type, int flag, int size, int status) {
  */
 void readCommandServer(int sockfd, Command_packet * packet) {
 
+	printf("readC %d %p\n", sockfd, packet);
+
 	// Declare integer buffer
-	int iBuf;
+	int iBuf[4];
 
-	// Get type
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->type = ntohl(iBuf);
-
-	// Get flag
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->flag = ntohl(iBuf);
-
-	// Get size
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->size = ntohl(iBuf);
-
-	// Get status
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->status = ntohl(iBuf);
+	// Read bytes
+	readn(sockfd, (char *)&iBuf, 16);
+	packet->type = ntohl(iBuf[0]);
+	packet->flag = ntohl(iBuf[1]);
+	packet->size = ntohl(iBuf[2]);
+	packet->status = ntohl(iBuf[3]);
 }
 
 /* READCOMMAND
@@ -150,27 +134,20 @@ void readCommandServer(int sockfd, Command_packet * packet) {
  */
 void * readCommand(int sockfd) {
 
-	// Declare integer buffer
-	int iBuf;
+	printf("read: %d\n", sockfd);
 
 	// Allocate memory for command packet struct
 	Command_packet * packet = (Command_packet *)malloc(sizeof(Command_packet));
 
-	// Get type
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->type = ntohl(iBuf);
+	// Declare integer buffer
+	int iBuf[4];
 
-	// Get flag
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->flag = ntohl(iBuf);
-
-	// Get size
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->size = ntohl(iBuf);
-
-	// Get status
-	readn(sockfd, (char *)&iBuf, 4);
-	packet->status = ntohl(iBuf);
+	// Read bytes
+	readn(sockfd, (char *)(&iBuf[0]), 16);
+	packet->type = ntohl(iBuf[0]);
+	packet->flag = ntohl(iBuf[1]);
+	packet->size = ntohl(iBuf[2]);
+	packet->status = ntohl(iBuf[3]);
 	
 	return (void *)packet;
 }
@@ -233,7 +210,9 @@ int writen(int fd, char * ptr, int nbytes) {
  *
  * Returns file descriptor if pathname with appropriate access mode.
  */
-int netopen(const char * pathname, int flags) {
+int netopen(const char * pathname, int sockfd, int flags) {
+
+	printf("netopen\n");
 
 	// Send command to server
 	writeCommand(sockfd, 1, flags, strlen(pathname), 0);
@@ -266,7 +245,9 @@ int netopen(const char * pathname, int flags) {
  *
  * Closes file.
  */
-int netclose(int fd) {
+int netclose(int sockfd, int fd) {
+
+	printf("netclose\n");
 
 	// Send command to server
 	writeCommand(sockfd, 2, 0, 0, fd);
@@ -292,7 +273,9 @@ int netclose(int fd) {
  *
  * Returns the number of bytes successfully read from the file.
  */
-ssize_t netread(int fd, void * buf, size_t nbyte) {
+ssize_t netread(int sockfd, int fd, void * buf, size_t nbyte) {
+
+	printf("netread\n");
 
 	// Send command to server
 	writeCommand(sockfd, 3, 0, nbyte, fd);
@@ -326,7 +309,9 @@ ssize_t netread(int fd, void * buf, size_t nbyte) {
  *
  * Returns the number of bytes successfully written to the file.
  */
-ssize_t netwrite(int fd, const void * buf, size_t nbyte) {
+ssize_t netwrite(int sockfd, int fd, const void * buf, size_t nbyte) {
+
+	printf("netwrite\n");
 
 	// Send command to server
 	writeCommand(sockfd, 4, 0, nbyte, fd);

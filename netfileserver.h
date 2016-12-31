@@ -5,4 +5,5 @@ typedef struct open_file_data {
 } Open_File_Data;
 
 // Functions
+void intHandler(int signum);
 int get_server_ip(char * ip_str);
