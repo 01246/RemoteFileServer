@@ -13,7 +13,6 @@
 #include "libnetfiles.h"
 
 #define LOOP_BACK_ADDR "127.0.0.1"
-#define SERVER_IP_ADDR "172.27.192.169"
 #define IP_SIZE 50
 #define IN_FILENAME_MAX 50
 #define BUFFER_MAX 50
@@ -57,38 +56,39 @@ void get_server_ip(char * ip_str) {
 /* MAIN */
 int main(int argc, char *argv[]) {
 
+	// Declare buffers
+	char ip_str[IP_SIZE];
 	char filename[IN_FILENAME_MAX];
 	char message[BUFFER_MAX];
 
-	strcpy(filename, argv[1]);
-	strcpy(message, argv[2]);
-
-	// Declare and allocate memory for IP address of server
-	char * ip_str = (char *)malloc(sizeof(char)*IP_SIZE);
-
-	// Initialize IP address of server
-	get_server_ip(ip_str);
-
+	// Copy command line arguments to buffers
+	strcpy(ip_str, argv[1]);
+	strcpy(filename, argv[2]);
+	strcpy(message, argv[3]);
+	
 	// Initialize server connection
-	int sockfd = netserverinit("128.6.13.174");
+	int sockfd = netserverinit(ip_str);
 
 	// Open file
-	int fd = netopen("file0.txt", sockfd, O_RDWR);
+	int fd = netopen(filename, sockfd, O_RDWR);
 
+	// Allocate size for buffer
 	char * buf = (char *)malloc(sizeof(char)*BUFFER_MAX);
-	
 	int flag;
 
-	sleep(3);
-
 	if (fd > -1) {
+
+		// Read from file
 		netread(sockfd, fd, buf, BUFFER_MAX);
-		printf("Read: %s\n", buf);
+
+		// Write to file
+		netwrite(sockfd, fd, message, BUFFER_MAX);
+
+		// Close file
 		flag = netclose(sockfd, fd);
 	}
 
 	// Free allocated memory
-	free(ip_str);
 	free(buf);
 
 	return 0;

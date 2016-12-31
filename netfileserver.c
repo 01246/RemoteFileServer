@@ -79,7 +79,6 @@ int get_server_ip(char * ip_str) {
 	        	break;
 	        }
 	    }
-
 	    // Go to next interface address struct
     	temp = temp->ifa_next;
 	}
@@ -90,7 +89,6 @@ int get_server_ip(char * ip_str) {
 	return 0;
 }
 
-
 /* EXECUTECLIENTCOMMANDS
  *
  * Take commands across the network and execute.
@@ -99,7 +97,6 @@ int executeClientCommands(Thread_data * td) {
 
 	// Initialize socket and client ID
 	int * sockfd = td->cli_fd;
-	int client_id = td->client_id;
 	Command_packet * cPtr = td->cPtr;
 
 	// Loop through incoming client commands
@@ -117,11 +114,13 @@ int executeClientCommands(Thread_data * td) {
 		int wr_size = cPtr->size;
 		int fd_index = cPtr->status;
 
+		// Check if file index is within the limit
 		if (fd_index < 0 || fd_index > OPEN_FILES_MAX-1) {
 			writeCommand(*sockfd, 0, 9, -1, -1);
 			break;
 		}
 
+		// Allocate space for buffer
 		pthread_mutex_lock(&m_lock);
 		char * buf = (char *)malloc(sizeof(char)*(wr_size+1));
 		pthread_mutex_unlock(&m_lock);
@@ -138,7 +137,6 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check readn
 				if (nbytes != wr_size) {
-					printf("%d\n", *sockfd);
 					writeCommand(*sockfd, 0, errno, 0, -1);
 					free(buf);
 					break;
@@ -179,7 +177,6 @@ int executeClientCommands(Thread_data * td) {
 				openFiles[cli_id][i].isActive = 1;
 
 				// Send response to client
-				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, 0, i);
 
 				// Free buffer
@@ -202,7 +199,6 @@ int executeClientCommands(Thread_data * td) {
 				openFiles[cli_id][fd_index].isActive = 0;
 				
 				// Send message to client
-				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, 0, status);
 				break;
 
@@ -231,13 +227,11 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check writen
 				if (nbytes != wr_size){
-					printf("%d\n", *sockfd);
 					writeCommand(*sockfd, 0, errno, -1, 0);
 					break;
 				}
 
 				// Send message to client
-				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
 
 				// Free buffer
@@ -264,7 +258,6 @@ int executeClientCommands(Thread_data * td) {
 
 				// Error check readn
 				if (nbytes != wr_size){
-					printf("%d\n", *sockfd);
 					writeCommand(*sockfd, 0, errno, -1, 0);
 					break;
 				}
@@ -276,7 +269,6 @@ int executeClientCommands(Thread_data * td) {
 				}
 
 				// Send message to client
-				printf("%d\n", *sockfd);
 				writeCommand(*sockfd, 0, 0, wr_size, 0);
 
 				// Free buffer
@@ -390,7 +382,8 @@ int main(int argc, char *argv[]) {
 			break;
 		} else {
 			td[i] = (Thread_data *)malloc(sizeof(Thread_data));
-			td[i]->cli_fd = &cli_fd;
+			td[i]->cli_fd = (int *)malloc(sizeof(int));
+			*(td[i]->cli_fd) = cli_fd;
 			td[i]->client_id = client_id;
 			td[i]->cPtr = (Command_packet *)malloc(sizeof(Command_packet));
 		}
